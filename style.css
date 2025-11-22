@@ -3,7 +3,7 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    user-select: none; /* Prevent text selection during fast clicking */
+    user-select: none;
 }
 
 body {
@@ -16,10 +16,9 @@ body {
     overflow: hidden;
 }
 
-/* Game Container (Top 80%) */
 .game-container {
     position: relative;
-    flex: 8; /* Occupies 80% roughly */
+    flex: 8; 
     background-color: #000;
     width: 100%;
     display: flex;
@@ -28,37 +27,52 @@ body {
 }
 
 canvas {
-    background-color: #050505;
+    background-color: #111;
     display: block;
-    /* Canvas size will be set by JS, but max size helps layout */
-    max-width: 100%;
-    max-height: 100%;
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+    width: 100%;
+    height: 100%;
+    /* Subtle grid pattern handled in JS, but we give it a dark base */
 }
 
 /* Overlays */
-#messageOverlay {
+#messageOverlay, #bossOverlay {
     position: absolute;
     top: 20%;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 2rem;
-    font-weight: bold;
-    color: #ff3333;
-    text-shadow: 0 0 10px #ff0000;
+    font-size: 3rem;
+    font-weight: 900;
+    text-shadow: 0 0 20px rgba(0,0,0,0.8);
     pointer-events: none;
     transition: opacity 0.5s;
+    text-align: center;
+    z-index: 5;
+}
+
+#messageOverlay { color: #ff3333; }
+
+.boss-warning {
+    color: #ff0000;
+    font-size: 4rem !important;
+    animation: pulse 0.5s infinite alternate;
+    text-transform: uppercase;
+    text-shadow: 0 0 30px #ff0000;
+}
+
+@keyframes pulse {
+    from { transform: translateX(-50%) scale(1); opacity: 0.8; }
+    to { transform: translateX(-50%) scale(1.1); opacity: 1; }
 }
 
 .hidden {
-    opacity: 0;
+    opacity: 0 !important;
     pointer-events: none;
 }
 
 #gameOverOverlay {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.9);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -68,9 +82,9 @@ canvas {
 #gameOverOverlay h1 { font-size: 4rem; color: #ff4444; margin-bottom: 20px; }
 #gameOverOverlay p { font-size: 1.5rem; margin-bottom: 30px; color: #ccc; }
 
-/* UI Panel (Bottom 20%) */
+/* UI Panel */
 .ui-panel {
-    flex: 2; /* Occupies 20% roughly */
+    flex: 2;
     background-color: #1a1a1a;
     border-top: 2px solid #333;
     padding: 10px 20px;
@@ -79,14 +93,13 @@ canvas {
     justify-content: space-around;
 }
 
-/* Stats Row */
 .stats-row {
     display: flex;
     justify-content: space-around;
-    font-size: 1.2rem;
+    font-size: 1.5rem; /* Larger stats */
     font-weight: bold;
 }
-.gold-text { color: #ffd700; }
+.gold-text { color: #ffd700; text-shadow: 0 0 5px #aa8800; }
 .hp-text { color: #ff5555; }
 
 .ui-divider {
@@ -95,75 +108,48 @@ canvas {
     margin: 5px 0;
 }
 
-/* Controls Row */
 .controls-row {
     display: flex;
-    justify-content: space-between;
+    justify-content: center; /* Center everything since no lane buttons */
     align-items: center;
-    gap: 20px;
+    gap: 40px;
 }
-
-/* Lane Buttons */
-.lane-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.label { font-size: 0.9rem; color: #888; margin-right: 5px; }
 
 button {
     cursor: pointer;
-    border: 1px solid #444;
+    border: 2px solid #444;
     background: #2a2a2a;
     color: #fff;
-    padding: 10px 15px;
-    border-radius: 4px;
+    padding: 12px 20px;
+    border-radius: 6px;
     font-weight: bold;
-    transition: all 0.2s;
+    font-size: 1rem;
+    transition: all 0.1s;
+    box-shadow: 0 4px 0 #111;
 }
-button:hover { background: #3a3a3a; border-color: #666; }
-button:active { transform: translateY(2px); }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:hover { background: #3a3a3a; border-color: #666; transform: translateY(-2px); box-shadow: 0 6px 0 #111; }
+button:active { transform: translateY(2px); box-shadow: 0 0 0 #111; }
+button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; filter: grayscale(1); }
 
-/* Active Lane Style */
-.btn-lane.active {
-    background-color: #005500;
-    border-color: #00ff00;
-    box-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
-}
-
-/* Spawn Buttons */
 .spawn-controls {
     display: flex;
-    gap: 15px;
+    gap: 20px;
 }
 .btn-spawn {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-width: 140px;
+    gap: 10px;
+    min-width: 160px;
 }
-.unit-icon {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-}
+.unit-icon { width: 20px; height: 20px; border-radius: 50%; }
 .icon-green { background-color: #00ff00; }
 .icon-blue { background-color: #0088ff; }
 
-.btn-spawn.green:hover:not(:disabled) { border-color: #00ff00; }
-.btn-spawn.blue:hover:not(:disabled) { border-color: #0088ff; }
+.btn-spawn.green:hover:not(:disabled) { border-color: #00ff00; background-color: #002200; }
+.btn-spawn.blue:hover:not(:disabled) { border-color: #0088ff; background-color: #001122; }
 
-/* Restart Button */
 .btn-restart {
     background-color: #331111;
     border-color: #552222;
 }
-.btn-restart:hover { background-color: #551111; border-color: #ff3333; }
-
-/* Mobile adjustments */
-@media (max-width: 768px) {
-    .controls-row { flex-direction: column; gap: 10px; }
-    .stats-row { font-size: 1rem; }
-    .btn-spawn { min-width: auto; padding: 8px; }
-}
+.btn-restart:hover { background-color: #661111; border-color: #ff3333; }
