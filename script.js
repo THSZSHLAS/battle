@@ -7,7 +7,7 @@ const CONFIG = {
     
     // Economy & Stats
     INITIAL_GOLD: 10,
-    INITIAL_HP: 20, // Increased Base HP for single lane intensity
+    INITIAL_HP: 20, 
     KILLS_PER_GOLD: 1,
     
     // Unit Basics
@@ -32,11 +32,11 @@ const CONFIG = {
             type: 'enemy_yellow', cost: 0, hp: 6, atk: 2, speedMult: 1.2, 
             isAlly: false, color: '#ffff00', imgPath: 'img/enemy_yellow.png' 
         },
-        // NEW: Kamikaze Unit (Fast, Low HP, Explodes)
+        // Kamikaze Unit
         enemy_kamikaze: {
-            type: 'enemy_kamikaze', cost: 0, hp: 2, atk: 0, speedMult: 2.5, // Very Fast
-            isAlly: false, color: '#8800ff', imgPath: 'img/enemy_red.png', // Reusing red img or fallback color
-            isKamikaze: true, explosionDmg: 5, explosionRadius: 80
+            type: 'enemy_kamikaze', cost: 0, hp: 2, atk: 0, speedMult: 3.0, // Very Fast
+            isAlly: false, color: '#8800ff', imgPath: 'img/enemy_red.png', // Uses red image tint or fallback
+            isKamikaze: true, explosionDmg: 5
         }
     },
 
@@ -44,20 +44,21 @@ const CONFIG = {
     ATTACK_COOLDOWN: 0.6,
     
     // Spawning
-    WAVE_INTERVAL: 4,      // Faster waves
-    BOSS_INTERVAL: 180,    // 3 Minutes
+    WAVE_INTERVAL: 4,      
+    BOSS_INTERVAL: 180,    
 };
 
 /**
  * VISUAL EFFECTS CLASSES
  */
 class FloatingText {
-    constructor(text, x, y, color) {
+    constructor(text, x, y, color, size = 20) {
         this.text = text;
         this.x = x;
         this.y = y;
         this.color = color || '#ff3333';
-        this.life = 1.0; // Seconds
+        this.size = size;
+        this.life = 1.5; // Seconds
         this.vy = -30;   // Float up speed
     }
     update(dt) {
@@ -65,14 +66,15 @@ class FloatingText {
         this.life -= dt;
     }
     draw(ctx) {
+        ctx.save();
         ctx.globalAlpha = Math.max(0, this.life);
         ctx.fillStyle = this.color;
-        ctx.font = 'bold 20px Arial';
+        ctx.font = `bold ${this.size}px Arial`;
+        ctx.textAlign = "center"; // Center align text
         ctx.shadowColor = 'black';
-        ctx.shadowBlur = 2;
+        ctx.shadowBlur = 4;
         ctx.fillText(this.text, this.x, this.y);
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1.0;
+        ctx.restore();
     }
 }
 
@@ -92,13 +94,14 @@ class Particle {
         this.x += this.vx * dt;
         this.y += this.vy * dt;
         this.life -= dt;
-        this.size *= 0.95; // Shrink
+        this.size *= 0.95; 
     }
     draw(ctx) {
+        ctx.save();
         ctx.globalAlpha = Math.max(0, this.life);
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x, this.y, this.size, this.size);
-        ctx.globalAlpha = 1.0;
+        ctx.restore();
     }
 }
 
@@ -115,12 +118,11 @@ const state = {
     killCounterForGold: 0,
     
     units: [],
-    effects: [], // Stores Particles and FloatingText
+    effects: [], 
     images: {},
     
     spawnTimer: 0,
     nextBossTime: CONFIG.BOSS_INTERVAL,
-    isBossActive: false
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -174,9 +176,9 @@ class Unit {
         this.isKamikaze = conf.isKamikaze || false;
         this.isBoss = isBoss;
         
-        // Single Lane Positioning: Center + Random Jitter (so they look like a crowd)
+        // Positioning
         const centerX = canvas.width / 2;
-        this.x = centerX + (Math.random() * 160 - 80); // Spread width 160px
+        this.x = centerX + (Math.random() * 160 - 80); 
         this.y = this.isAlly ? canvas.height - 50 : 50;
         
         // Stats
@@ -192,19 +194,17 @@ class Unit {
         this.radius = CONFIG.UNIT_RADIUS;
         this.color = conf.color;
         
-        // Boss Modifications
         if (this.isBoss) {
-            this.hp *= 20; // Huge HP
+            this.hp *= 20; 
             this.maxHp = this.hp;
-            this.radius *= 3; // Huge Size
+            this.radius *= 3; 
             this.atk *= 2;
-            this.speed *= 0.5; // Slow
-            this.x = centerX; // Boss enters centered
+            this.speed *= 0.5; 
+            this.x = centerX; 
         }
         
         this.attackTimer = 0;
-        this.hitFlashTimer = 0; // For white flash effect
-        this.markedForDeletion = false;
+        this.hitFlashTimer = 0; 
     }
 
     update(dt) {
@@ -214,32 +214,25 @@ class Unit {
 
     takeDamage(amount) {
         this.hp -= amount;
-        this.hitFlashTimer = 0.1; // Flash white for 0.1s
-        
-        // Add Floating Text
+        this.hitFlashTimer = 0.1; 
         state.effects.push(new FloatingText(`-${amount}`, this.x, this.y - this.radius - 10));
     }
 
     draw(ctx) {
         ctx.save();
         
-        // Shadow for depth
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = 10;
         ctx.shadowOffsetY = 5;
 
-        // Clip Circle
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.closePath();
         
-        // 1. Draw Unit (Image or Flash)
         if (this.hitFlashTimer > 0) {
-            // FLASH WHITE
             ctx.fillStyle = '#ffffff';
             ctx.fill();
         } else {
-            // NORMAL DRAW
             ctx.clip();
             const asset = state.images[this.type];
             if (asset && asset.ready) {
@@ -248,13 +241,13 @@ class Unit {
                     this.radius * 2, this.radius * 2
                 );
             } else {
-                ctx.fillStyle = this.isKamikaze ? '#800080' : this.color;
+                ctx.fillStyle = this.isKamikaze ? '#8800ff' : this.color;
                 ctx.fill();
             }
         }
         ctx.restore();
 
-        // 2. Boss Health Bar
+        // HP Bar/Ring
         if (this.isBoss) {
             const barW = 100;
             const barH = 10;
@@ -266,7 +259,6 @@ class Unit {
             ctx.strokeStyle = '#fff';
             ctx.strokeRect(this.x - barW/2, this.y - this.radius - 20, barW, barH);
         } else {
-            // Normal Unit HP Ring
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
             ctx.lineWidth = 2;
@@ -283,6 +275,12 @@ class Unit {
 function spawnUnit(type, isBoss = false) {
     const u = new Unit(type, isBoss);
     state.units.push(u);
+
+    // 【新增特效文字逻辑】
+    if (type === 'enemy_kamikaze') {
+        state.effects.push(new FloatingText("道士下山！", canvas.width / 2, canvas.height / 2, "#d400ff", 40));
+    }
+    // 注意：蓝山冲撞的逻辑在按钮点击事件里，因为那里才确认是玩家生成的
 }
 
 function spawnExplosion(x, y, color) {
@@ -292,36 +290,31 @@ function spawnExplosion(x, y, color) {
 }
 
 function checkSpawns(dt) {
-    // BOSS SPAWN
     if (state.gameTime > state.nextBossTime) {
         state.nextBossTime += CONFIG.BOSS_INTERVAL;
-        
-        // Alert UI
         ui.bossOverlay.classList.remove('hidden');
         setTimeout(() => ui.bossOverlay.classList.add('hidden'), 4000);
         
-        // Pick random visual (Red or Yellow)
         const bossType = Math.random() < 0.5 ? 'enemy_red' : 'enemy_yellow';
         spawnUnit(bossType, true);
-        return; // Skip regular wave this frame
+        return; 
     }
 
     state.spawnTimer += dt;
     if (state.spawnTimer >= CONFIG.WAVE_INTERVAL) {
         state.spawnTimer = 0;
         
-        // Dynamic Difficulty
         const baseCount = 2 + Math.floor(state.gameTime / 45);
         
         for(let i=0; i<baseCount; i++) {
             const r = Math.random();
             let type = 'enemy_red';
             
-            // Late game logic
             if (state.gameTime > 60 && r < 0.2) type = 'enemy_yellow';
-            if (state.gameTime > 30 && r > 0.9) type = 'enemy_kamikaze'; // 10% chance for kamikaze
+            // 20% 概率刷出道士（自爆兵），前提是游戏时间超过 30秒
+            if (state.gameTime > 30 && r > 0.8) type = 'enemy_kamikaze'; 
             
-            setTimeout(() => spawnUnit(type), i * 300); // Stagger spawn
+            setTimeout(() => spawnUnit(type), i * 300); 
         }
     }
 }
@@ -331,36 +324,33 @@ function update(dt) {
     state.gameTime += dt;
     checkSpawns(dt);
 
-    // Update Units
+    // 修复 Bug 的关键：在循环中做安全检查，防止 undefined
     for (let i = 0; i < state.units.length; i++) {
         let u1 = state.units[i];
+        if (!u1 || u1.hp <= 0) continue; // Skip dead/invalid
+
         let hasTarget = false;
 
-        // COMBAT LOGIC
         // Find nearest enemy
-        let nearestDist = Infinity;
-        let target = null;
-
         for (let j = 0; j < state.units.length; j++) {
             if (i === j) continue;
             let u2 = state.units[j];
+            if (!u2 || u2.hp <= 0) continue; // Safety Check
 
             if (u1.isAlly !== u2.isAlly) {
                 const dx = u1.x - u2.x;
                 const dy = u1.y - u2.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
 
-                // Kamikaze Logic: Check if close enough to explode
+                // Kamikaze Logic
                 if (u1.isKamikaze && dist < (u1.radius + u2.radius + 10)) {
-                    // EXPLODE!
                     spawnExplosion(u1.x, u1.y, '#aa00ff');
-                    // Damage target (and maybe others nearby? For simplicity just target)
                     u2.takeDamage(u1.explosionDmg);
-                    u1.hp = 0; // Die immediately
+                    u1.hp = 0; 
                     break; 
                 }
 
-                // Normal Combat Logic
+                // Normal Combat
                 if (dist < (u1.radius + u2.radius + CONFIG.COMBAT_RANGE)) {
                     hasTarget = true;
                     if (u1.attackTimer <= 0) {
@@ -371,14 +361,10 @@ function update(dt) {
             }
         }
 
-        // MOVEMENT
-        // If Kamikaze: Always move unless dead
-        // If Normal: Move if not fighting
+        // Movement
         if ((u1.isKamikaze || !hasTarget) && u1.hp > 0) {
             const moveDir = u1.isAlly ? -1 : 1;
             u1.y += u1.speed * moveDir * dt;
-            
-            // Slight movement towards center if too far out
             const centerX = canvas.width / 2;
             u1.x += (centerX - u1.x) * 0.1 * dt; 
         }
@@ -386,7 +372,7 @@ function update(dt) {
         u1.update(dt);
     }
 
-    // Update Effects (Particles/Text)
+    // Effects Update
     for (let i = state.effects.length - 1; i >= 0; i--) {
         state.effects[i].update(dt);
         if (state.effects[i].life <= 0) {
@@ -398,24 +384,24 @@ function update(dt) {
     for (let i = state.units.length - 1; i >= 0; i--) {
         let u = state.units[i];
         
-        // Death
         if (u.hp <= 0) {
-            spawnExplosion(u.x, u.y, u.color); // Visuals
+            spawnExplosion(u.x, u.y, u.color);
             if (!u.isAlly) handleEnemyKill();
             state.units.splice(i, 1);
             continue;
         }
 
-        // Base Hit / Ally Exit
+        // Base Hit
         if (!u.isAlly && u.y > canvas.height + u.radius) {
-            state.baseHp -= u.isBoss ? 10 : 1; // Boss hurts more
-            state.effects.push(new FloatingText(u.isBoss ? "-10 HP" : "-1 HP", canvas.width/2, canvas.height - 50, '#ff0000'));
+            state.baseHp -= u.isBoss ? 10 : 1;
+            state.effects.push(new FloatingText(u.isBoss ? "-10 HP" : "-1 HP", canvas.width/2, canvas.height - 100, '#ff0000', 30));
             state.units.splice(i, 1);
             if (state.baseHp <= 0) endGame();
             continue;
         }
+        // Ally Exit
         if (u.isAlly && u.y < -u.radius) {
-            state.units.splice(i, 1); // Ally safely escaped
+            state.units.splice(i, 1);
             continue;
         }
     }
@@ -445,11 +431,10 @@ function updateUI() {
 }
 
 function draw() {
-    // Clean background
     ctx.fillStyle = '#050505';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw "Road"
+    // Road
     const roadW = 300;
     const cx = canvas.width / 2;
     ctx.fillStyle = '#111';
@@ -460,12 +445,11 @@ function draw() {
     ctx.moveTo(cx + roadW/2, 0); ctx.lineTo(cx + roadW/2, canvas.height);
     ctx.stroke();
 
-    // Draw Units
-    // Sort by Y so units lower down draw on top (fake 3D)
-    state.units.sort((a, b) => a.y - b.y);
-    state.units.forEach(u => u.draw(ctx));
+    // 【关键修复】：这里使用 [...state.units] 创建副本再排序
+    // 之前直接 sort 会打乱 state.units 的原始顺序，导致 update 循环中索引错乱产生 undefined
+    const renderList = [...state.units].sort((a, b) => a.y - b.y);
+    renderList.forEach(u => u.draw(ctx));
 
-    // Draw Effects
     state.effects.forEach(e => e.draw(ctx));
 }
 
@@ -495,9 +479,7 @@ function restartGame() {
     requestAnimationFrame(gameLoop);
 }
 
-// Input (Click anywhere to spawn Green, Right click or Shift+Click for Blue??)
-// Actually let's keep buttons for simplicity on mobile, 
-// BUT add keyboard shortcuts: 1 for Green, 2 for Blue
+// Controls
 window.addEventListener('keydown', (e) => {
     if(e.key === '1') ui.btnGreen.click();
     if(e.key === '2') ui.btnBlue.click();
@@ -509,12 +491,16 @@ ui.btnGreen.addEventListener('click', () => {
         spawnUnit('ally_green');
     }
 });
+
 ui.btnBlue.addEventListener('click', () => {
     if (state.gold >= CONFIG.UNITS.ally_blue.cost) {
         state.gold -= CONFIG.UNITS.ally_blue.cost;
         spawnUnit('ally_blue');
+        // 【新增特效文字】蓝山冲撞
+        state.effects.push(new FloatingText("蓝山冲撞", canvas.width / 2, canvas.height / 2, "#0088ff", 40));
     }
 });
+
 ui.btnRestart.addEventListener('click', restartGame);
 ui.btnRestartOverlay.addEventListener('click', restartGame);
 
