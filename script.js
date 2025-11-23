@@ -4,7 +4,7 @@
 const CONFIG = {
     // Economy & Stats
     INITIAL_GOLD: 10,
-    INITIAL_HP: 50,      
+    INITIAL_HP: 30,      // 基地血量 50
     KILLS_PER_GOLD: 1,
     
     // Unit Basics
@@ -41,14 +41,14 @@ const CONFIG = {
     
     // Spawning
     WAVE_INTERVAL: 4,      
-    BOSS_APPEAR_TIME: 180, // 【已修复】设置为 180秒 (3分钟) 后出现 BOSS
+    BOSS_APPEAR_TIME: 180, // 【修复】必须等待 180秒 (3分钟)
 };
 
 /**
  * VISUAL EFFECTS CLASSES
  */
 class FloatingText {
-    constructor(text, x, y, color, size = 24, duration = 2.5) {
+    constructor(text, x, y, color, size = 24, duration = 2.0) {
         this.text = text;
         this.x = x;
         this.y = y;
@@ -56,7 +56,7 @@ class FloatingText {
         this.size = size;
         this.life = duration;
         this.maxLife = duration;
-        this.vy = -20; 
+        this.vy = -30; 
     }
     update(dt) {
         this.y += this.vy * dt;
@@ -121,11 +121,11 @@ const state = {
     spawnTimer: 0,
     bossSpawned: false,
     
-    // UI Timers (Wait timers to hide text)
+    // UI Timers
     bossOverlayTimer: 0,
     msgOverlayTimer: 0,
     
-    // Flags for specific script events
+    // Flags
     flags: {
         bossPhase1: false, // HP < 30
         bossPhase2: false, // HP < 5
@@ -195,18 +195,18 @@ class Unit {
         this.hp = conf.hp;
         this.maxHp = conf.hp;
         this.atk = conf.atk;
-        
-        // Boss Logic
+        this.radius = CONFIG.UNIT_RADIUS;
+        this.speedMult = conf.speedMult;
+        this.color = conf.color;
+
+        // 【修改】Boss 数值调整
         if (this.isBoss) {
-            this.hp = 50; 
-            this.maxHp = 50;
+            this.hp = 20; // 【用户要求】Boss HP 调整为 20
+            this.maxHp = 20;
             this.radius = CONFIG.UNIT_RADIUS * 3; 
             this.atk = 2;
-            this.speedMult = 0.4; // Boss walks slow
+            this.speedMult = 0.4; 
             this.x = centerX; 
-        } else {
-            this.radius = CONFIG.UNIT_RADIUS;
-            this.speedMult = conf.speedMult;
         }
 
         // Speed scaling
@@ -214,7 +214,6 @@ class Unit {
         if (!this.isAlly) timeMult = 1 + (Math.floor(state.gameTime / 60) * 0.1);
         this.speed = CONFIG.BASE_SPEED * this.speedMult * timeMult;
         
-        this.color = conf.color;
         this.attackTimer = 0;
         this.hitFlashTimer = 0; 
     }
@@ -271,7 +270,6 @@ class Unit {
             ctx.strokeStyle = '#fff';
             ctx.strokeRect(this.x - barW/2, this.y - this.radius - 25, barW, barH);
             
-            // Text
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 12px Arial';
             ctx.textAlign = 'center';
@@ -302,22 +300,20 @@ function spawnExplosion(x, y, color) {
     }
 }
 
-// 【修复】改用 Timer 控制，确保一定会消失
+// 【修复】确保 Timer 正确设置
 function showBigText(text, color) {
     ui.msgOverlay.innerText = text;
     ui.msgOverlay.style.color = color;
     ui.msgOverlay.classList.remove('hidden');
-    state.msgOverlayTimer = 3.5; // Show for 3.5 seconds
+    state.msgOverlayTimer = 3.5; 
 }
 
 function checkSpawns(dt) {
     // 1. Boss Spawn Logic
     if (!state.bossSpawned && state.gameTime > CONFIG.BOSS_APPEAR_TIME) {
         state.bossSpawned = true;
-        
         ui.bossOverlay.classList.remove('hidden');
-        state.bossOverlayTimer = 4.0; // Show Warning for 4 seconds
-        
+        state.bossOverlayTimer = 4.0; 
         spawnUnit('enemy_red', true); 
         return; 
     }
@@ -327,6 +323,7 @@ function checkSpawns(dt) {
     if (state.spawnTimer >= CONFIG.WAVE_INTERVAL) {
         state.spawnTimer = 0;
         
+        // As time goes on, more enemies
         const count = 1 + Math.floor(state.gameTime / 60);
         for(let i=0; i<count; i++) {
             const type = (Math.random() < 0.2) ? 'enemy_yellow' : 'enemy_red';
@@ -340,7 +337,6 @@ function updateScriptEvents() {
     if (!state.flags.allyCrisis && state.baseHp < 15 && state.baseHp > 0) {
         state.flags.allyCrisis = true;
         showBigText("蓝山心法- 第8式 变身 --- 特斯拉喷气机", "#00ccff");
-        // Spawn 3 Elite Allies
         setTimeout(() => spawnUnit('ally_blue'), 100);
         setTimeout(() => spawnUnit('ally_blue'), 300);
         setTimeout(() => spawnUnit('ally_blue'), 500);
@@ -349,14 +345,12 @@ function updateScriptEvents() {
     // B. Boss Events
     const boss = state.units.find(u => u.isBoss && u.hp > 0);
     if (boss) {
-        // Phase 1: HP < 30
-        if (!state.flags.bossPhase1 && boss.hp < 30) {
+        // Phase 1: HP < 10 (Half of 20) -> Originally < 30
+        if (!state.flags.bossPhase1 && boss.hp < 15) { 
             state.flags.bossPhase1 = true;
             showBigText("西之呼吸 - 第三式 恶魔微笑", "#ffff00");
-            
             spawnUnit('enemy_yellow');
             setTimeout(() => spawnUnit('enemy_yellow'), 500);
-            setTimeout(() => spawnUnit('enemy_yellow'), 1000);
         }
 
         // Phase 2: HP < 5
@@ -370,15 +364,12 @@ function updateScriptEvents() {
                 for(let i=0; i<10; i++) {
                     setTimeout(() => {
                         const u = spawnUnit('enemy_kamikaze');
-                        u.y = boss.y; // Spawn from boss
+                        u.y = boss.y; 
                     }, i * 150);
                 }
             };
-            
             spawnWave(); 
-            setTimeout(() => {
-                if(state.isRunning) spawnWave();
-            }, 3000);
+            setTimeout(() => { if(state.isRunning) spawnWave(); }, 3000);
         }
     }
 }
@@ -387,14 +378,18 @@ function update(dt) {
     if (!state.isRunning) return;
     state.gameTime += dt;
     
-    // 【修复】UI Timer Logic - 在主循环中倒计时，防止 UI 卡住
+    // 【修复】Timer 在每一帧减少，确保文字一定消失
     if (state.bossOverlayTimer > 0) {
         state.bossOverlayTimer -= dt;
-        if (state.bossOverlayTimer <= 0) ui.bossOverlay.classList.add('hidden');
+        if (state.bossOverlayTimer <= 0) {
+            ui.bossOverlay.classList.add('hidden');
+        }
     }
     if (state.msgOverlayTimer > 0) {
         state.msgOverlayTimer -= dt;
-        if (state.msgOverlayTimer <= 0) ui.msgOverlay.classList.add('hidden');
+        if (state.msgOverlayTimer <= 0) {
+            ui.msgOverlay.classList.add('hidden');
+        }
     }
 
     checkSpawns(dt);
@@ -407,7 +402,6 @@ function update(dt) {
 
         let hasTarget = false;
 
-        // Combat
         for (let j = 0; j < units.length; j++) {
             if (i === j) continue;
             let u2 = units[j];
@@ -433,7 +427,6 @@ function update(dt) {
             }
         }
 
-        // Move
         if ((u1.isKamikaze || !hasTarget) && u1.hp > 0) {
             const moveDir = u1.isAlly ? -1 : 1;
             u1.y += u1.speed * moveDir * dt;
@@ -444,13 +437,11 @@ function update(dt) {
         u1.update(dt);
     }
 
-    // Effects
     for (let i = state.effects.length - 1; i >= 0; i--) {
         state.effects[i].update(dt);
         if (state.effects[i].life <= 0) state.effects.splice(i, 1);
     }
 
-    // Cleanup & Win/Loss Logic
     for (let i = units.length - 1; i >= 0; i--) {
         let u = units[i];
         
@@ -459,7 +450,7 @@ function update(dt) {
             if (!u.isAlly) {
                 handleEnemyKill();
                 if (u.isBoss) {
-                    endGame(true); // VICTORY
+                    endGame(true); 
                     return;
                 }
             }
@@ -472,7 +463,7 @@ function update(dt) {
             state.effects.push(new FloatingText(u.isBoss ? "CRITICAL" : "-1 HP", canvas.width/2, canvas.height - 80, '#ff0000', 30));
             units.splice(i, 1);
             if (state.baseHp <= 0) {
-                endGame(false); // DEFEAT
+                endGame(false); 
                 return;
             }
             continue;
@@ -537,19 +528,48 @@ function restartGame() {
     state.spawnTimer = 0;
     state.bossSpawned = false;
     
+    // Reset timers ensures text disappears on restart
     state.bossOverlayTimer = 0;
     state.msgOverlayTimer = 0;
+    ui.bossOverlay.classList.add('hidden');
+    ui.msgOverlay.classList.add('hidden');
     
     state.flags.bossPhase1 = false;
     state.flags.bossPhase2 = false;
     state.flags.allyCrisis = false;
 
     ui.gameOverOverlay.classList.add('hidden');
-    ui.bossOverlay.classList.add('hidden');
-    ui.msgOverlay.classList.add('hidden');
-    
     state.lastTime = performance.now();
     requestAnimationFrame(gameLoop);
+}
+
+// 【新增】生成我方士兵的通用逻辑（含 5% SSR 概率）
+function spawnAlly(type, cost) {
+    if (state.gold >= cost) {
+        state.gold -= cost;
+
+        // SSR 判定 (5%)
+        if (Math.random() < 0.05) {
+            // 生成超级士兵
+            const u = spawnUnit('ally_blue'); // 使用 3G 蓝兵图片
+            u.hp = 10;
+            u.maxHp = 10;
+            u.radius *= 1.2; // 稍微大一点
+            u.color = '#ffd700'; // Fallback color gold
+            
+            // 金色特效字
+            state.effects.push(new FloatingText("SSR! 超级战士!", u.x, u.y - 30, "#ffd700", 24));
+            showBigText("SSR! 欧气爆发!", "#ffd700");
+        } else {
+            // 正常生成
+            spawnUnit(type);
+            
+            // 蓝兵的特殊文字
+            if (type === 'ally_blue') {
+                 state.effects.push(new FloatingText("蓝山冲撞", canvas.width / 2, canvas.height - 100, "#0088ff", 40));
+            }
+        }
+    }
 }
 
 // Controls
@@ -559,18 +579,11 @@ window.addEventListener('keydown', (e) => {
 });
 
 ui.btnGreen.addEventListener('click', () => {
-    if (state.gold >= CONFIG.UNITS.ally_green.cost) {
-        state.gold -= CONFIG.UNITS.ally_green.cost;
-        spawnUnit('ally_green');
-    }
+    spawnAlly('ally_green', CONFIG.UNITS.ally_green.cost);
 });
 
 ui.btnBlue.addEventListener('click', () => {
-    if (state.gold >= CONFIG.UNITS.ally_blue.cost) {
-        state.gold -= CONFIG.UNITS.ally_blue.cost;
-        spawnUnit('ally_blue');
-        state.effects.push(new FloatingText("蓝山冲撞", canvas.width / 2, canvas.height - 100, "#0088ff", 40));
-    }
+    spawnAlly('ally_blue', CONFIG.UNITS.ally_blue.cost);
 });
 
 ui.btnRestart.addEventListener('click', restartGame);
