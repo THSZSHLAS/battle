@@ -2,16 +2,13 @@
  * GAME CONFIGURATION
  */
 const CONFIG = {
-    // Economy & Stats
     INITIAL_GOLD: 10,
-    INITIAL_HP: 30, // 我方血量
+    INITIAL_HP: 30, // 我方血量 30
     KILLS_PER_GOLD: 1,
     
-    // Unit Basics
     UNIT_RADIUS: 22,
     BASE_SPEED: 60,
     
-    // Unit Types
     UNITS: {
         ally_green: { 
             type: 'ally_green', cost: 1, hp: 3, atk: 1, speedMult: 1.0, 
@@ -39,14 +36,10 @@ const CONFIG = {
     COMBAT_RANGE: 10,
     ATTACK_COOLDOWN: 0.6,
     
-    // Spawning
     WAVE_INTERVAL: 4,      
-    BOSS_APPEAR_TIME: 180, // 3分钟后 Boss 出现
+    BOSS_APPEAR_TIME: 180, 
 };
 
-/**
- * VISUAL EFFECTS CLASSES
- */
 class FloatingText {
     constructor(text, x, y, color, size = 24, duration = 2.0) {
         this.text = text;
@@ -102,9 +95,6 @@ class Particle {
     }
 }
 
-/**
- * GLOBAL STATE
- */
 const state = {
     lastTime: 0,
     gameTime: 0,
@@ -121,11 +111,9 @@ const state = {
     spawnTimer: 0,
     bossSpawned: false,
     
-    // UI Timers
     bossOverlayTimer: 0,
     msgOverlayTimer: 0,
     
-    // Flags
     flags: {
         bossPhase1: false, 
         bossPhase2: false, 
@@ -140,7 +128,6 @@ const ui = {
     time: document.getElementById('displayTime'),
     gold: document.getElementById('displayGold'),
     hp: document.getElementById('displayBaseHp'),
-    // 【修改点】这里可能获取不到元素，所以我们允许它是 null，后面会做检查
     bossHp: document.getElementById('displayBossHp'), 
     kills: document.getElementById('displayKills'),
     btnGreen: document.getElementById('btnSpawnGreen'),
@@ -155,9 +142,6 @@ const ui = {
     finalStats: document.getElementById('finalStats')
 };
 
-/**
- * ASSET LOADING
- */
 function loadAssets() {
     const keys = Object.keys(CONFIG.UNITS);
     keys.forEach(key => {
@@ -176,9 +160,6 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-/**
- * UNIT CLASS
- */
 class Unit {
     constructor(configKey, isBoss = false) {
         const conf = CONFIG.UNITS[configKey];
@@ -229,11 +210,9 @@ class Unit {
 
     draw(ctx) {
         ctx.save();
-        
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = 10;
         ctx.shadowOffsetY = 5;
-
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.closePath();
@@ -256,7 +235,6 @@ class Unit {
         }
         ctx.restore();
 
-        // 绘制普通单位头顶的血量
         if (!this.isBoss) { 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -291,17 +269,21 @@ function spawnExplosion(x, y, color) {
 }
 
 function showBigText(text, color) {
-    ui.msgOverlay.innerText = text;
-    ui.msgOverlay.style.color = color;
-    ui.msgOverlay.classList.remove('hidden');
-    state.msgOverlayTimer = 3.5; 
+    if(ui.msgOverlay) {
+        ui.msgOverlay.innerText = text;
+        ui.msgOverlay.style.color = color;
+        ui.msgOverlay.classList.remove('hidden');
+        state.msgOverlayTimer = 3.5; 
+    }
 }
 
 function checkSpawns(dt) {
     if (!state.bossSpawned && state.gameTime > CONFIG.BOSS_APPEAR_TIME) {
         state.bossSpawned = true;
-        ui.bossOverlay.classList.remove('hidden');
-        state.bossOverlayTimer = 4.0; 
+        if(ui.bossOverlay) {
+            ui.bossOverlay.classList.remove('hidden');
+            state.bossOverlayTimer = 4.0; 
+        }
         spawnUnit('enemy_red', true); 
         return; 
     }
@@ -362,11 +344,11 @@ function update(dt) {
     
     if (state.bossOverlayTimer > 0) {
         state.bossOverlayTimer -= dt;
-        if (state.bossOverlayTimer <= 0) ui.bossOverlay.classList.add('hidden');
+        if (state.bossOverlayTimer <= 0 && ui.bossOverlay) ui.bossOverlay.classList.add('hidden');
     }
     if (state.msgOverlayTimer > 0) {
         state.msgOverlayTimer -= dt;
-        if (state.msgOverlayTimer <= 0) ui.msgOverlay.classList.add('hidden');
+        if (state.msgOverlayTimer <= 0 && ui.msgOverlay) ui.msgOverlay.classList.add('hidden');
     }
 
     checkSpawns(dt);
@@ -464,16 +446,14 @@ function handleEnemyKill() {
     }
 }
 
+// 【终极修复】防止任何 UI 缺失导致的崩溃
 function updateUI() {
     const m = Math.floor(state.gameTime / 60).toString().padStart(2, '0');
     const s = Math.floor(state.gameTime % 60).toString().padStart(2, '0');
-    ui.time.innerText = `Time ${m}:${s}`;
-    ui.gold.innerText = `Gold: ${state.gold}`;
-    
-    ui.hp.innerText = `我方: ${state.baseHp}`;
+    if(ui.time) ui.time.innerText = `Time ${m}:${s}`;
+    if(ui.gold) ui.gold.innerText = `Gold: ${state.gold}`;
+    if(ui.hp) ui.hp.innerText = `我方: ${state.baseHp}`;
 
-    // 【核心修复】这里加了一个 if 判断
-    // 如果 ui.bossHp 不存在（HTML 还没更新好），我们就不去设置它，防止报错崩溃
     if (ui.bossHp) {
         const boss = state.units.find(u => u.isBoss && u.hp > 0);
         if (boss) {
@@ -485,27 +465,31 @@ function updateUI() {
         }
     }
 
-    ui.kills.innerText = `Kills: ${state.kills}`;
+    if(ui.kills) ui.kills.innerText = `Kills: ${state.kills}`;
 
-    ui.btnGreen.disabled = state.gold < CONFIG.UNITS.ally_green.cost;
-    ui.btnBlue.disabled = state.gold < CONFIG.UNITS.ally_blue.cost;
+    if(ui.btnGreen) ui.btnGreen.disabled = state.gold < CONFIG.UNITS.ally_green.cost;
+    if(ui.btnBlue) ui.btnBlue.disabled = state.gold < CONFIG.UNITS.ally_blue.cost;
 }
 
 function endGame(victory) {
     state.isRunning = false;
-    ui.gameOverOverlay.classList.remove('hidden');
+    if(ui.gameOverOverlay) ui.gameOverOverlay.classList.remove('hidden');
     
     if (victory) {
-        ui.endTitle.innerText = "独尊蓝山心法";
-        ui.endTitle.style.color = "#0088ff";
-        ui.endSubtitle.innerText = "BOSS 已被讨伐，天下太平。";
+        if(ui.endTitle) {
+            ui.endTitle.innerText = "独尊蓝山心法";
+            ui.endTitle.style.color = "#0088ff";
+        }
+        if(ui.endSubtitle) ui.endSubtitle.innerText = "BOSS 已被讨伐，天下太平。";
     } else {
-        ui.endTitle.innerText = "菜 就来";
-        ui.endTitle.style.color = "#ff4444";
-        ui.endSubtitle.innerText = "畅想机器人入学！";
+        if(ui.endTitle) {
+            ui.endTitle.innerText = "菜 就来";
+            ui.endTitle.style.color = "#ff4444";
+        }
+        if(ui.endSubtitle) ui.endSubtitle.innerText = "畅想机器人入学！";
     }
     
-    ui.finalStats.innerText = `Survival: ${Math.floor(state.gameTime)}s | Kills: ${state.kills}`;
+    if(ui.finalStats) ui.finalStats.innerText = `Survival: ${Math.floor(state.gameTime)}s | Kills: ${state.kills}`;
 }
 
 function restartGame() {
@@ -522,14 +506,14 @@ function restartGame() {
     
     state.bossOverlayTimer = 0;
     state.msgOverlayTimer = 0;
-    ui.bossOverlay.classList.add('hidden');
-    ui.msgOverlay.classList.add('hidden');
+    if(ui.bossOverlay) ui.bossOverlay.classList.add('hidden');
+    if(ui.msgOverlay) ui.msgOverlay.classList.add('hidden');
     
     state.flags.bossPhase1 = false;
     state.flags.bossPhase2 = false;
     state.flags.allyCrisis = false;
 
-    ui.gameOverOverlay.classList.add('hidden');
+    if(ui.gameOverOverlay) ui.gameOverOverlay.classList.add('hidden');
     state.lastTime = performance.now();
     requestAnimationFrame(gameLoop);
 }
@@ -557,22 +541,29 @@ function spawnAlly(type, cost) {
 }
 
 window.addEventListener('keydown', (e) => {
-    if(e.key === '1') ui.btnGreen.click();
-    if(e.key === '2') ui.btnBlue.click();
+    if(e.key === '1' && ui.btnGreen) ui.btnGreen.click();
+    if(e.key === '2' && ui.btnBlue) ui.btnBlue.click();
 });
 
-ui.btnGreen.addEventListener('click', () => {
-    spawnAlly('ally_green', CONFIG.UNITS.ally_green.cost);
-});
+if(ui.btnGreen) {
+    ui.btnGreen.addEventListener('click', () => {
+        spawnAlly('ally_green', CONFIG.UNITS.ally_green.cost);
+    });
+}
 
-ui.btnBlue.addEventListener('click', () => {
-    spawnAlly('ally_blue', CONFIG.UNITS.ally_blue.cost);
-});
+if(ui.btnBlue) {
+    ui.btnBlue.addEventListener('click', () => {
+        spawnAlly('ally_blue', CONFIG.UNITS.ally_blue.cost);
+    });
+}
 
-ui.btnRestart.addEventListener('click', restartGame);
-ui.btnRestartOverlay.addEventListener('click', restartGame);
+if(ui.btnRestart) ui.btnRestart.addEventListener('click', restartGame);
+if(ui.btnRestartOverlay) ui.btnRestartOverlay.addEventListener('click', restartGame);
 
 function gameLoop(timestamp) {
+    // 【修复】处理初始时间差
+    if (state.lastTime === 0) state.lastTime = timestamp;
+    
     const dt = (timestamp - state.lastTime) / 1000; 
     state.lastTime = timestamp;
 
@@ -603,7 +594,6 @@ function draw() {
 
     state.effects.forEach(e => e.draw(ctx));
 
-    // 绘制顶部大血条
     const boss = state.units.find(u => u.isBoss && u.hp > 0);
     if (boss) {
         const barW = canvas.width * 0.6; 
@@ -630,5 +620,6 @@ function draw() {
 }
 
 loadAssets();
-state.lastTime = performance.now();
+// 不再立即调用 loop，而是等第一帧请求
+state.lastTime = 0; 
 requestAnimationFrame(gameLoop);
