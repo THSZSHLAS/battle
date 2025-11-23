@@ -4,7 +4,7 @@
 const CONFIG = {
     // Economy & Stats
     INITIAL_GOLD: 10,
-    INITIAL_HP: 30,      // 基地血量 50
+    INITIAL_HP: 30,      // 【已修改】基地血量改为 30
     KILLS_PER_GOLD: 1,
     
     // Unit Basics
@@ -41,7 +41,7 @@ const CONFIG = {
     
     // Spawning
     WAVE_INTERVAL: 4,      
-    BOSS_APPEAR_TIME: 180, // 【修复】必须等待 180秒 (3分钟)
+    BOSS_APPEAR_TIME: 180, // 3分钟
 };
 
 /**
@@ -199,9 +199,9 @@ class Unit {
         this.speedMult = conf.speedMult;
         this.color = conf.color;
 
-        // 【修改】Boss 数值调整
+        // Boss Logic
         if (this.isBoss) {
-            this.hp = 20; // 【用户要求】Boss HP 调整为 20
+            this.hp = 20; 
             this.maxHp = 20;
             this.radius = CONFIG.UNIT_RADIUS * 3; 
             this.atk = 2;
@@ -258,8 +258,9 @@ class Unit {
         }
         ctx.restore();
 
-        // Boss Health Bar
+        // 【新增】绘制血量逻辑
         if (this.isBoss) {
+            // Boss 血条
             const barW = 120;
             const barH = 12;
             const pct = Math.max(0, this.hp / this.maxHp);
@@ -275,10 +276,25 @@ class Unit {
             ctx.textAlign = 'center';
             ctx.fillText(`${Math.ceil(this.hp)}/${this.maxHp}`, this.x, this.y - this.radius - 30);
         } else {
+            // 普通单位：绘制血量数字（带描边，防看不清）
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 14px Arial';
+            
+            // 描边
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#000'; // 黑色描边
+            ctx.strokeText(Math.ceil(this.hp), this.x, this.y);
+            
+            // 文字
+            ctx.fillStyle = '#fff'; // 白色文字
+            ctx.fillText(Math.ceil(this.hp), this.x, this.y);
+
+            // 外部光圈
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
             ctx.lineWidth = 2;
-            ctx.strokeStyle = this.isAlly ? '#fff' : '#000';
+            ctx.strokeStyle = this.isAlly ? '#fff' : '#000'; // 我方白圈，敌方黑圈
             ctx.stroke();
         }
     }
@@ -300,7 +316,6 @@ function spawnExplosion(x, y, color) {
     }
 }
 
-// 【修复】确保 Timer 正确设置
 function showBigText(text, color) {
     ui.msgOverlay.innerText = text;
     ui.msgOverlay.style.color = color;
@@ -323,7 +338,6 @@ function checkSpawns(dt) {
     if (state.spawnTimer >= CONFIG.WAVE_INTERVAL) {
         state.spawnTimer = 0;
         
-        // As time goes on, more enemies
         const count = 1 + Math.floor(state.gameTime / 60);
         for(let i=0; i<count; i++) {
             const type = (Math.random() < 0.2) ? 'enemy_yellow' : 'enemy_red';
@@ -345,7 +359,7 @@ function updateScriptEvents() {
     // B. Boss Events
     const boss = state.units.find(u => u.isBoss && u.hp > 0);
     if (boss) {
-        // Phase 1: HP < 10 (Half of 20) -> Originally < 30
+        // Phase 1: HP < 10
         if (!state.flags.bossPhase1 && boss.hp < 15) { 
             state.flags.bossPhase1 = true;
             showBigText("西之呼吸 - 第三式 恶魔微笑", "#ffff00");
@@ -378,7 +392,6 @@ function update(dt) {
     if (!state.isRunning) return;
     state.gameTime += dt;
     
-    // 【修复】Timer 在每一帧减少，确保文字一定消失
     if (state.bossOverlayTimer > 0) {
         state.bossOverlayTimer -= dt;
         if (state.bossOverlayTimer <= 0) {
@@ -528,7 +541,6 @@ function restartGame() {
     state.spawnTimer = 0;
     state.bossSpawned = false;
     
-    // Reset timers ensures text disappears on restart
     state.bossOverlayTimer = 0;
     state.msgOverlayTimer = 0;
     ui.bossOverlay.classList.add('hidden');
@@ -543,28 +555,22 @@ function restartGame() {
     requestAnimationFrame(gameLoop);
 }
 
-// 【新增】生成我方士兵的通用逻辑（含 5% SSR 概率）
 function spawnAlly(type, cost) {
     if (state.gold >= cost) {
         state.gold -= cost;
 
         // SSR 判定 (5%)
         if (Math.random() < 0.05) {
-            // 生成超级士兵
-            const u = spawnUnit('ally_blue'); // 使用 3G 蓝兵图片
+            const u = spawnUnit('ally_blue'); 
             u.hp = 10;
             u.maxHp = 10;
-            u.radius *= 1.2; // 稍微大一点
-            u.color = '#ffd700'; // Fallback color gold
+            u.radius *= 1.2; 
+            u.color = '#ffd700'; 
             
-            // 金色特效字
             state.effects.push(new FloatingText("SSR! 超级战士!", u.x, u.y - 30, "#ffd700", 24));
             showBigText("SSR! 欧气爆发!", "#ffd700");
         } else {
-            // 正常生成
             spawnUnit(type);
-            
-            // 蓝兵的特殊文字
             if (type === 'ally_blue') {
                  state.effects.push(new FloatingText("蓝山冲撞", canvas.width / 2, canvas.height - 100, "#0088ff", 40));
             }
@@ -572,7 +578,6 @@ function spawnAlly(type, cost) {
     }
 }
 
-// Controls
 window.addEventListener('keydown', (e) => {
     if(e.key === '1') ui.btnGreen.click();
     if(e.key === '2') ui.btnBlue.click();
