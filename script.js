@@ -2,13 +2,16 @@
  * GAME CONFIGURATION
  */
 const CONFIG = {
+    // Economy & Stats
     INITIAL_GOLD: 10,
-    INITIAL_HP: 30, // 我方血量 30
+    INITIAL_HP: 30, // 我方血量
     KILLS_PER_GOLD: 1,
     
+    // Unit Basics
     UNIT_RADIUS: 22,
     BASE_SPEED: 60,
     
+    // Unit Types
     UNITS: {
         ally_green: { 
             type: 'ally_green', cost: 1, hp: 3, atk: 1, speedMult: 1.0, 
@@ -36,8 +39,9 @@ const CONFIG = {
     COMBAT_RANGE: 10,
     ATTACK_COOLDOWN: 0.6,
     
+    // Spawning
     WAVE_INTERVAL: 4,      
-    BOSS_APPEAR_TIME: 180, 
+    BOSS_APPEAR_TIME: 180, // 3分钟后 Boss 出现
 };
 
 /**
@@ -117,9 +121,11 @@ const state = {
     spawnTimer: 0,
     bossSpawned: false,
     
+    // UI Timers
     bossOverlayTimer: 0,
     msgOverlayTimer: 0,
     
+    // Flags
     flags: {
         bossPhase1: false, 
         bossPhase2: false, 
@@ -134,7 +140,8 @@ const ui = {
     time: document.getElementById('displayTime'),
     gold: document.getElementById('displayGold'),
     hp: document.getElementById('displayBaseHp'),
-    bossHp: document.getElementById('displayBossHp'), // 安全获取
+    // 【修改点】这里可能获取不到元素，所以我们允许它是 null，后面会做检查
+    bossHp: document.getElementById('displayBossHp'), 
     kills: document.getElementById('displayKills'),
     btnGreen: document.getElementById('btnSpawnGreen'),
     btnBlue: document.getElementById('btnSpawnBlue'),
@@ -148,6 +155,9 @@ const ui = {
     finalStats: document.getElementById('finalStats')
 };
 
+/**
+ * ASSET LOADING
+ */
 function loadAssets() {
     const keys = Object.keys(CONFIG.UNITS);
     keys.forEach(key => {
@@ -166,6 +176,9 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+/**
+ * UNIT CLASS
+ */
 class Unit {
     constructor(configKey, isBoss = false) {
         const conf = CONFIG.UNITS[configKey];
@@ -243,6 +256,7 @@ class Unit {
         }
         ctx.restore();
 
+        // 绘制普通单位头顶的血量
         if (!this.isBoss) { 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -458,7 +472,8 @@ function updateUI() {
     
     ui.hp.innerText = `我方: ${state.baseHp}`;
 
-    // 【防崩溃修改】先检查 ui.bossHp 是否存在
+    // 【核心修复】这里加了一个 if 判断
+    // 如果 ui.bossHp 不存在（HTML 还没更新好），我们就不去设置它，防止报错崩溃
     if (ui.bossHp) {
         const boss = state.units.find(u => u.isBoss && u.hp > 0);
         if (boss) {
