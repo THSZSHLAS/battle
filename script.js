@@ -4,7 +4,7 @@
 const CONFIG = {
     // Economy & Stats
     INITIAL_GOLD: 10,
-    INITIAL_HP: 50,      // 我方基地血量设为50，以便触发 <15 的危机
+    INITIAL_HP: 50,      
     KILLS_PER_GOLD: 1,
     
     // Unit Basics
@@ -18,7 +18,7 @@ const CONFIG = {
             isAlly: true, color: '#00ff00', imgPath: 'img/ally_green.png' 
         },
         ally_blue:  { 
-            type: 'ally_blue',  cost: 3, hp: 8, atk: 2, speedMult: 1.5, // 蓝山心法-喷气机：速度快
+            type: 'ally_blue',  cost: 3, hp: 8, atk: 2, speedMult: 1.5, 
             isAlly: true, color: '#0088ff', imgPath: 'img/ally_blue.png' 
         },
         enemy_red:  { 
@@ -31,7 +31,7 @@ const CONFIG = {
         },
         enemy_kamikaze: {
             type: 'enemy_kamikaze', cost: 0, hp: 2, atk: 0, speedMult: 3.5, 
-            isAlly: false, color: '#8800ff', imgPath: 'img/enemy_red.png', // 建议换个紫色的图，没有就变色
+            isAlly: false, color: '#8800ff', imgPath: 'img/enemy_red.png', 
             isKamikaze: true, explosionDmg: 5
         }
     },
@@ -40,8 +40,8 @@ const CONFIG = {
     ATTACK_COOLDOWN: 0.6,
     
     // Spawning
-    WAVE_INTERVAL: 5,      
-    BOSS_APPEAR_TIME: 10, // 演示用：10秒后 Boss 就出来，方便你测试。你可以改成 180 (3分钟)
+    WAVE_INTERVAL: 4,      
+    BOSS_APPEAR_TIME: 180, // 【已修复】设置为 180秒 (3分钟) 后出现 BOSS
 };
 
 /**
@@ -64,7 +64,7 @@ class FloatingText {
     }
     draw(ctx) {
         ctx.save();
-        ctx.globalAlpha = Math.max(0, this.life / this.maxLife); // Fade out smoothly
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife); 
         ctx.fillStyle = this.color;
         ctx.font = `bold ${this.size}px "Microsoft YaHei", Arial`;
         ctx.textAlign = "center";
@@ -120,6 +120,10 @@ const state = {
     
     spawnTimer: 0,
     bossSpawned: false,
+    
+    // UI Timers (Wait timers to hide text)
+    bossOverlayTimer: 0,
+    msgOverlayTimer: 0,
     
     // Flags for specific script events
     flags: {
@@ -194,7 +198,7 @@ class Unit {
         
         // Boss Logic
         if (this.isBoss) {
-            this.hp = 50; // 【设定】Boss HP 50
+            this.hp = 50; 
             this.maxHp = 50;
             this.radius = CONFIG.UNIT_RADIUS * 3; 
             this.atk = 2;
@@ -205,7 +209,7 @@ class Unit {
             this.speedMult = conf.speedMult;
         }
 
-        // Speed scaling over time for enemies
+        // Speed scaling
         let timeMult = 1;
         if (!this.isAlly) timeMult = 1 + (Math.floor(state.gameTime / 60) * 0.1);
         this.speed = CONFIG.BASE_SPEED * this.speedMult * timeMult;
@@ -267,13 +271,12 @@ class Unit {
             ctx.strokeStyle = '#fff';
             ctx.strokeRect(this.x - barW/2, this.y - this.radius - 25, barW, barH);
             
-            // Show Boss HP Text
+            // Text
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 12px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(`${Math.ceil(this.hp)}/${this.maxHp}`, this.x, this.y - this.radius - 30);
         } else {
-            // Normal Unit HP Ring
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
             ctx.lineWidth = 2;
@@ -299,17 +302,12 @@ function spawnExplosion(x, y, color) {
     }
 }
 
+// 【修复】改用 Timer 控制，确保一定会消失
 function showBigText(text, color) {
     ui.msgOverlay.innerText = text;
     ui.msgOverlay.style.color = color;
-    ui.msgOverlay.style.opacity = 1;
     ui.msgOverlay.classList.remove('hidden');
-    
-    // Clear previous timeout if any (simple hack)
-    if(state.msgTimeout) clearTimeout(state.msgTimeout);
-    state.msgTimeout = setTimeout(() => {
-        ui.msgOverlay.style.opacity = 0;
-    }, 3000);
+    state.msgOverlayTimer = 3.5; // Show for 3.5 seconds
 }
 
 function checkSpawns(dt) {
@@ -318,13 +316,13 @@ function checkSpawns(dt) {
         state.bossSpawned = true;
         
         ui.bossOverlay.classList.remove('hidden');
-        setTimeout(() => ui.bossOverlay.classList.add('hidden'), 4000);
+        state.bossOverlayTimer = 4.0; // Show Warning for 4 seconds
         
-        spawnUnit('enemy_red', true); // Using enemy_red texture for Boss
+        spawnUnit('enemy_red', true); 
         return; 
     }
 
-    // 2. Regular Wave (Only if boss is not alive or just keep spawning? Let's keep spawning small fry)
+    // 2. Regular Wave
     state.spawnTimer += dt;
     if (state.spawnTimer >= CONFIG.WAVE_INTERVAL) {
         state.spawnTimer = 0;
@@ -338,19 +336,17 @@ function checkSpawns(dt) {
 }
 
 function updateScriptEvents() {
-    // A. Check Base Health Crisis
-    if (!state.flags.allyCrisis && state.baseHp < 15) {
+    // A. Ally Crisis
+    if (!state.flags.allyCrisis && state.baseHp < 15 && state.baseHp > 0) {
         state.flags.allyCrisis = true;
-        
         showBigText("蓝山心法- 第8式 变身 --- 特斯拉喷气机", "#00ccff");
-        
         // Spawn 3 Elite Allies
         setTimeout(() => spawnUnit('ally_blue'), 100);
         setTimeout(() => spawnUnit('ally_blue'), 300);
         setTimeout(() => spawnUnit('ally_blue'), 500);
     }
 
-    // B. Check Boss Health Triggers
+    // B. Boss Events
     const boss = state.units.find(u => u.isBoss && u.hp > 0);
     if (boss) {
         // Phase 1: HP < 30
@@ -358,7 +354,6 @@ function updateScriptEvents() {
             state.flags.bossPhase1 = true;
             showBigText("西之呼吸 - 第三式 恶魔微笑", "#ffff00");
             
-            // Spawn 3 Yellows
             spawnUnit('enemy_yellow');
             setTimeout(() => spawnUnit('enemy_yellow'), 500);
             setTimeout(() => spawnUnit('enemy_yellow'), 1000);
@@ -369,23 +364,18 @@ function updateScriptEvents() {
             state.flags.bossPhase2 = true;
             showBigText("雍之呼吸 - 第一式 百雍夜行", "#aa00ff");
             
-            // Spawn 5 Red immediately
             for(let i=0; i<5; i++) spawnUnit('enemy_red');
 
-            // Spawn 10 Kamikaze now
             const spawnWave = () => {
                 for(let i=0; i<10; i++) {
                     setTimeout(() => {
                         const u = spawnUnit('enemy_kamikaze');
-                        // Make them spawn near boss
-                        u.y = boss.y; 
-                    }, i * 100);
+                        u.y = boss.y; // Spawn from boss
+                    }, i * 150);
                 }
             };
             
-            spawnWave(); // First 10
-            
-            // Second 10 after 3 seconds
+            spawnWave(); 
             setTimeout(() => {
                 if(state.isRunning) spawnWave();
             }, 3000);
@@ -397,10 +387,19 @@ function update(dt) {
     if (!state.isRunning) return;
     state.gameTime += dt;
     
+    // 【修复】UI Timer Logic - 在主循环中倒计时，防止 UI 卡住
+    if (state.bossOverlayTimer > 0) {
+        state.bossOverlayTimer -= dt;
+        if (state.bossOverlayTimer <= 0) ui.bossOverlay.classList.add('hidden');
+    }
+    if (state.msgOverlayTimer > 0) {
+        state.msgOverlayTimer -= dt;
+        if (state.msgOverlayTimer <= 0) ui.msgOverlay.classList.add('hidden');
+    }
+
     checkSpawns(dt);
     updateScriptEvents();
 
-    // Unit Loop
     const units = state.units;
     for (let i = 0; i < units.length; i++) {
         let u1 = units[i];
@@ -417,7 +416,6 @@ function update(dt) {
             if (u1.isAlly !== u2.isAlly) {
                 const dist = Math.hypot(u1.x - u2.x, u1.y - u2.y);
 
-                // Kamikaze
                 if (u1.isKamikaze && dist < (u1.radius + u2.radius + 15)) {
                     spawnExplosion(u1.x, u1.y, '#aa00ff');
                     u2.takeDamage(u1.explosionDmg);
@@ -425,7 +423,6 @@ function update(dt) {
                     break; 
                 }
 
-                // Normal
                 if (dist < (u1.radius + u2.radius + CONFIG.COMBAT_RANGE)) {
                     hasTarget = true;
                     if (u1.attackTimer <= 0) {
@@ -462,7 +459,7 @@ function update(dt) {
             if (!u.isAlly) {
                 handleEnemyKill();
                 if (u.isBoss) {
-                    endGame(true); // VICTORY!
+                    endGame(true); // VICTORY
                     return;
                 }
             }
@@ -470,9 +467,8 @@ function update(dt) {
             continue;
         }
 
-        // Enemy reached base
         if (!u.isAlly && u.y > canvas.height + u.radius) {
-            state.baseHp -= u.isBoss ? 999 : 1; // Boss instantly kills base
+            state.baseHp -= u.isBoss ? 999 : 1; 
             state.effects.push(new FloatingText(u.isBoss ? "CRITICAL" : "-1 HP", canvas.width/2, canvas.height - 80, '#ff0000', 30));
             units.splice(i, 1);
             if (state.baseHp <= 0) {
@@ -482,7 +478,6 @@ function update(dt) {
             continue;
         }
         
-        // Ally reached top
         if (u.isAlly && u.y < -u.radius) {
             units.splice(i, 1);
             continue;
@@ -542,7 +537,9 @@ function restartGame() {
     state.spawnTimer = 0;
     state.bossSpawned = false;
     
-    // Reset flags
+    state.bossOverlayTimer = 0;
+    state.msgOverlayTimer = 0;
+    
     state.flags.bossPhase1 = false;
     state.flags.bossPhase2 = false;
     state.flags.allyCrisis = false;
@@ -572,7 +569,6 @@ ui.btnBlue.addEventListener('click', () => {
     if (state.gold >= CONFIG.UNITS.ally_blue.cost) {
         state.gold -= CONFIG.UNITS.ally_blue.cost;
         spawnUnit('ally_blue');
-        // 特效文字
         state.effects.push(new FloatingText("蓝山冲撞", canvas.width / 2, canvas.height - 100, "#0088ff", 40));
     }
 });
@@ -580,7 +576,6 @@ ui.btnBlue.addEventListener('click', () => {
 ui.btnRestart.addEventListener('click', restartGame);
 ui.btnRestartOverlay.addEventListener('click', restartGame);
 
-// Main Loop
 function gameLoop(timestamp) {
     const dt = (timestamp - state.lastTime) / 1000; 
     state.lastTime = timestamp;
@@ -597,7 +592,6 @@ function draw() {
     ctx.fillStyle = '#050505';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Road
     const roadW = 320;
     const cx = canvas.width / 2;
     ctx.fillStyle = '#111';
@@ -608,7 +602,6 @@ function draw() {
     ctx.moveTo(cx + roadW/2, 0); ctx.lineTo(cx + roadW/2, canvas.height);
     ctx.stroke();
 
-    // Sort to make units lower down appear on top
     const renderList = [...state.units].sort((a, b) => a.y - b.y);
     renderList.forEach(u => u.draw(ctx));
 
