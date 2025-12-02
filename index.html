@@ -11,23 +11,32 @@
         body { margin: 0; padding: 0; background-color: #1a1a1a; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: white; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent; }
 
         /* === 核心视觉 UI：呼吸圆环 === */
-        #visual-ring { width: 220px; height: 220px; border: 8px solid #444; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); position: relative; background: rgba(0,0,0,0.2); }
+        #visual-ring { width: 220px; height: 220px; border: 8px solid #444; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); position: relative; background: rgba(0,0,0,0.2); z-index: 5; }
         
-        /* 学习中：绿色呼吸 */
+        /* 状态样式 */
         body.studying #visual-ring { border-color: #2ecc71; box-shadow: 0 0 40px rgba(46, 204, 113, 0.4); animation: breathe 3s infinite ease-in-out; }
-        /* 警告：红色脉冲 */
         body.warning #visual-ring { border-color: #e74c3c; background-color: rgba(231, 76, 60, 0.15); box-shadow: 0 0 60px rgba(231, 76, 60, 0.7); transform: scale(1.05); animation: pulse-red 0.8s infinite; }
-        /* 休息中：蓝色常亮 */
         body.break #visual-ring { border-color: #3498db; background-color: rgba(52, 152, 219, 0.15); box-shadow: 0 0 40px rgba(52, 152, 219, 0.5); animation: none; transform: scale(0.95); }
 
-        /* 状态图标与文字 */
         .icon { font-size: 60px; transition: all 0.3s; }
-        #status-text { margin-top: 40px; font-size: 20px; font-weight: 400; opacity: 0.8; letter-spacing: 1px; text-align: center; height: 30px; transition: color 0.3s; }
+        #status-text { margin-top: 40px; font-size: 20px; font-weight: 400; opacity: 0.8; letter-spacing: 1px; text-align: center; height: 30px; transition: color 0.3s; z-index: 5; }
         body.warning #status-text { color: #ff7675; font-weight: bold; }
 
-        /* 隐藏视频源 (右上角预览) */
-        video { position: absolute; top: 20px; right: 20px; width: 100px; height: 75px; object-fit: cover; opacity: 0.3; border-radius: 8px; transform: scaleX(-1); border: 1px solid #555; transition: opacity 0.3s; z-index: 10; }
-        video:active { opacity: 1; } /* 点击查看清晰画面 */
+        /* === 视频源 (放大 3 倍 & 提高层级) === */
+        video { 
+            position: absolute; 
+            top: 20px; right: 20px; 
+            width: 300px; height: 225px; 
+            object-fit: cover; 
+            opacity: 0.8; 
+            border-radius: 12px; 
+            transform: scaleX(-1); 
+            border: 2px solid #555; 
+            transition: all 0.3s; 
+            z-index: 150; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        video:hover, video:active { opacity: 1; border-color: #2ecc71; }
 
         /* 底部控制栏 */
         #controls { position: fixed; bottom: 40px; display: flex; gap: 15px; align-items: center; padding: 10px 20px; background: rgba(30,30,30,0.8); backdrop-filter: blur(10px); border-radius: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); padding-bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 50; }
@@ -42,15 +51,16 @@
         #mode-select { background: #444; color: #fff; padding-right: 30px; text-align: center; border: 1px solid #555; }
 
         /* 校准遮罩 */
-        #countdown-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 100; padding: 20px; box-sizing: border-box; }
-        #cnt-num { font-size: 28px; font-weight: bold; color: #2ecc71; margin-bottom: 30px; }
+        #countdown-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 100; padding: 20px; box-sizing: border-box; }
+        #cnt-num { font-size: 28px; font-weight: bold; color: #2ecc71; margin-bottom: 30px; margin-top: 200px; }
         .calib-section { margin-bottom: 25px; width: 100%; max-width: 320px; text-align: center; }
         .calib-desc { font-size: 16px; color: #eee; margin-bottom: 10px; }
         .calib-btn { width: 100%; padding: 14px; background: #333; border: 1px solid #555; color: #fff; }
         .calib-btn.done { background: #2ecc71; border-color: #2ecc71; color: #fff; }
         .calib-status { font-size: 12px; margin-top: 5px; color: #777; height: 16px; }
-        #calib-start-study-btn { background: linear-gradient(135deg, #2ecc71, #27ae60); width: 100%; margin-top: 20px; font-size: 18px; padding: 16px; opacity: 0.5; pointer-events: none; }
-        #calib-start-study-btn.ready { opacity: 1; pointer-events: auto; box-shadow: 0 0 20px rgba(46, 204, 113, 0.4); }
+        
+        #calib-start-study-btn { background: linear-gradient(135deg, #2ecc71, #27ae60); width: 100%; margin-top: 20px; font-size: 18px; padding: 16px; opacity: 0.5; pointer-events: none; transition: opacity 0.3s; }
+        #calib-start-study-btn.ready { opacity: 1; pointer-events: auto; box-shadow: 0 0 20px rgba(46, 204, 113, 0.4); transform: scale(1.05); }
 
         /* 报告面板 */
         #report-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); width: 320px; max-width: 90%; background: #222; color: #fff; padding: 30px; border-radius: 24px; display: none; flex-direction: column; gap: 15px; box-shadow: 0 25px 60px rgba(0,0,0,0.8); z-index: 200; text-align: center; border: 1px solid #333; opacity: 0; transition: all 0.3s; }
@@ -85,22 +95,20 @@
     </div>
 
     <div id="countdown-overlay">
-        <div id="cnt-num">姿态校准</div>
+        <div id="cnt-num">请看着右上角视频校准</div>
         
         <div class="calib-section">
-            <div class="calib-desc">① 正常坐姿，看向屏幕</div>
-            <button id="calib-screen-btn" class="calib-btn">锁定“看屏幕”姿态</button>
+            <button id="calib-screen-btn" class="calib-btn">① 保持“看屏幕”姿势，点我锁定</button>
             <div id="calib-screen-status" class="calib-status"></div>
         </div>
         
         <div class="calib-section">
-            <div class="calib-desc">② (可选) 低头看书/记笔记</div>
-            <button id="calib-book-btn" class="calib-btn">锁定“看书本”姿态</button>
+            <button id="calib-book-btn" class="calib-btn">② (可选) 保持“看书”姿势，点我锁定</button>
             <div id="calib-book-status" class="calib-status"></div>
         </div>
 
         <button id="calib-start-study-btn" class="calib-btn">开始监督</button>
-        <div style="font-size:12px; color:#666; margin-top:15px;">*所有计算均在本地完成，保护隐私</div>
+        <div style="font-size:12px; color:#666; margin-top:15px;">* 至少锁定一种姿势后，按钮变亮即可开始</div>
     </div>
 
     <div id="report-panel">
@@ -141,22 +149,18 @@
         // ================= 状态变量 =================
         let faceLandmarker = null;
         let isRunning = false;
-        let currentState = "IDLE"; // IDLE, FOCUSED, DISTRACTED, ABSENT, BREAK
+        let currentState = "IDLE"; 
         let lastVideoTime = -1;
         let lastCheck = 0;
         
-        // 姿态基准
         let baseScreenPose = null;
         let baseBookPose = null;
 
-        // 计时器
         let awayStartTime = null;
         let absentStartTime = null;
 
-        // 统计数据
         let stats = { startTime: 0, distractCount: 0, postureCount: 0, absentCount: 0, score: CONFIG.score.base };
 
-        // DOM 元素
         const els = {
             video: document.getElementById('webcam'),
             startBtn: document.getElementById('start-btn'),
@@ -192,7 +196,6 @@
 
         // ================= 核心流程 =================
         
-        // 1. 打开摄像头并进入校准
         els.startBtn.onclick = async () => {
             if (!faceLandmarker) return;
             try {
@@ -207,7 +210,7 @@
             }
         };
 
-        // 2. 校准逻辑
+        // 校准逻辑
         function capturePose() {
             const now = performance.now();
             const res = faceLandmarker.detectForVideo(els.video, now);
@@ -225,7 +228,7 @@
                 this.innerText = "已锁定 (看屏幕) ✅";
                 checkCalibReady();
                 speak("屏幕姿态已锁定。");
-            } else alert("未检测到人脸，请调整位置。");
+            } else alert("未检测到人脸，请看着右上角视频。");
         };
 
         document.getElementById('calib-book-btn').onclick = function() {
@@ -236,19 +239,19 @@
                 this.innerText = "已锁定 (看书本) ✅";
                 checkCalibReady();
                 speak("书本姿态已锁定。");
-            } else alert("未检测到人脸，请调整位置。");
+            } else alert("未检测到人脸，请看着右上角视频。");
         };
 
         function checkCalibReady() {
-            if (baseScreenPose) {
+            if (baseScreenPose || baseBookPose) { // 只要有一个就行
                 const btn = document.getElementById('calib-start-study-btn');
                 btn.classList.add('ready');
                 btn.disabled = false;
             }
         }
 
-        // 3. 正式开始
         document.getElementById('calib-start-study-btn').onclick = () => {
+            if (!baseScreenPose && !baseBookPose) return;
             els.overlay.style.display = 'none';
             startSession();
         };
@@ -259,7 +262,6 @@
             isRunning = true;
             currentState = "FOCUSED";
             
-            // UI 切换
             els.startBtn.style.display = 'none';
             els.modeSelect.style.display = 'none';
             els.breakBtn.style.display = 'block';
@@ -270,7 +272,7 @@
             loop();
         }
 
-        // 4. 循环检测
+        // 循环检测
         async function loop() {
             if (!isRunning) return;
             if (currentState === "BREAK") { requestAnimationFrame(loop); return; }
@@ -287,50 +289,41 @@
             requestAnimationFrame(loop);
         }
 
-        // 5. 行为分析 (核心算法)
+        // 行为分析
         function analyze(results) {
-            // A. 消失检测
             if (!results || !results.faceLandmarks || results.faceLandmarks.length === 0) {
                 handleStateChange("ABSENT");
                 return;
             }
-            absentStartTime = null; // 重置消失计时
+            absentStartTime = null;
 
             const lm = results.faceLandmarks[0];
             const currentPose = calculatePose(lm);
 
-            // B. 姿态判定 (双重基准)
             let isGoodPose = false;
-            
-            // 检查是否符合屏幕姿势
             if (baseScreenPose && checkPoseMatch(currentPose, baseScreenPose)) isGoodPose = true;
-            // 检查是否符合书本姿势
             if (!isGoodPose && baseBookPose && checkPoseMatch(currentPose, baseBookPose)) isGoodPose = true;
 
             if (isGoodPose) {
                 handleStateChange("FOCUSED");
             } else {
-                // 判断是歪头还是走神
                 const diffRoll = baseScreenPose ? Math.abs(currentPose.roll - baseScreenPose.roll) : 0;
                 if (diffRoll > CONFIG.threshold.rollDeg) {
-                    handleStateChange("POSTURE_BAD"); // 坐姿差
+                    handleStateChange("POSTURE_BAD");
                 } else {
-                    handleStateChange("DISTRACTED"); // 视线偏离
+                    handleStateChange("DISTRACTED");
                 }
             }
         }
 
-        // 状态机处理
         function handleStateChange(newState) {
-            // 1. 如果是 FOCUSED，持续加分
             if (newState === "FOCUSED") {
                 stats.score += CONFIG.score.focusPerSec * (CONFIG.checkInterval/1000);
                 if (stats.score > 100) stats.score = 100;
                 
                 if (currentState !== "FOCUSED") {
                     updateUI("studying", "📖", "专注中...");
-                    awayStartTime = null; // 重置偏离计时
-                    // 如果刚从错误状态回来，夸一下
+                    awayStartTime = null;
                     if (["DISTRACTED", "POSTURE_BAD", "ABSENT"].includes(currentState)) {
                         speak(pick(SPEECH.focusAgain));
                     }
@@ -339,17 +332,13 @@
                 return;
             }
 
-            // 2. 如果是异常状态，开始计时
             if (!awayStartTime) awayStartTime = Date.now();
             const elapsed = Date.now() - awayStartTime;
             const limit = (newState === "ABSENT") ? CONFIG.durations.absentMs : CONFIG.durations.distractedMs;
 
-            // 只有持续时间超过阈值，才真正报警
             if (elapsed > limit) {
                 if (currentState !== newState) {
                     currentState = newState;
-                    
-                    // 扣分与报警
                     if (newState === "DISTRACTED") {
                         stats.distractCount++;
                         stats.score -= CONFIG.score.distractPen;
@@ -369,27 +358,20 @@
                     if (stats.score < 0) stats.score = 0;
                 }
             } else {
-                // 缓冲期提示
-                document.body.className = "studying"; // 保持绿色，但文字提示
+                document.body.className = "studying";
                 els.statusText.innerText = "调整中...";
             }
         }
 
-        // ================= 辅助函数 =================
-        
         function calculatePose(lm) {
-            const nose = lm[1];
-            const leftEye = lm[33];
-            const rightEye = lm[263];
+            const nose = lm[1], leftEye = lm[33], rightEye = lm[263];
             const midX = (leftEye.x + rightEye.x) / 2;
             const eyeY = (leftEye.y + rightEye.y) / 2;
-            
             const yaw = nose.x - midX; 
             const pitch = nose.y - eyeY; 
             const dx = rightEye.x - leftEye.x;
             const dy = rightEye.y - leftEye.y;
             const roll = Math.atan2(dy, dx) * 180 / Math.PI;
-
             return { yaw, pitch, roll };
         }
 
@@ -407,51 +389,60 @@
         }
 
         function applyMode(mode) {
-            if (mode === "easy") {
-                CONFIG.threshold.angle = 0.35; CONFIG.durations.distractedMs = 4000;
-            } else if (mode === "hard") {
-                CONFIG.threshold.angle = 0.15; CONFIG.durations.distractedMs = 1500;
-            } else {
-                CONFIG.threshold.angle = 0.25; CONFIG.durations.distractedMs = 3000;
-            }
+            if (mode === "easy") { CONFIG.threshold.angle = 0.35; CONFIG.durations.distractedMs = 4000; }
+            else if (mode === "hard") { CONFIG.threshold.angle = 0.15; CONFIG.durations.distractedMs = 1500; }
+            else { CONFIG.threshold.angle = 0.25; CONFIG.durations.distractedMs = 3000; }
         }
 
-        // ================= 按钮逻辑 =================
         els.stopBtn.onclick = () => {
             const pwd = prompt("请输入密码停止监督：");
             if (pwd === CONFIG.PASSWORD) {
                 isRunning = false;
-                // 停止摄像头
                 if (els.video.srcObject) els.video.srcObject.getTracks().forEach(t => t.stop());
+                
+                // 修复：确保面板可见
+                els.report.style.display = 'flex';
+                // 延时添加动画类，确保 display:flex 已生效
+                setTimeout(() => els.report.classList.add('show'), 10);
+                
                 showReport();
             } else {
-                alert("密码错误！");
-                speak("密码错误，谁也别想跑。");
+                alert("密码错误！"); speak("密码错误，谁也别想跑。");
             }
         };
 
+        function showReport() {
+            const durationMs = Date.now() - stats.startTime;
+            const durationMin = Math.max(1, Math.round(durationMs / 60000));
+            document.getElementById('stat-time').innerText = durationMin + " 分钟";
+            document.getElementById('stat-distract').innerText = stats.distractCount + " 次";
+            document.getElementById('stat-posture').innerText = stats.postureCount + " 次";
+            document.getElementById('stat-absent').innerText = stats.absentCount + " 次";
+            const finalScore = Math.round(Math.max(0, Math.min(100, stats.score)));
+            document.getElementById('final-score').innerText = finalScore;
+            
+            const scoreEl = document.getElementById('final-score');
+            if (finalScore >= 85) scoreEl.style.color = "#2ecc71";
+            else if (finalScore >= 70) scoreEl.style.color = "#f1c40f";
+            else scoreEl.style.color = "#e74c3c";
+            
+            speak(SPEECH.stop + `你的专注积分是 ${finalScore} 分。`);
+        }
+
         els.breakBtn.onclick = () => {
             if (currentState === "BREAK") {
-                // 结束休息
-                currentState = "FOCUSED";
-                awayStartTime = null;
-                els.breakBtn.innerText = "休息";
-                els.stopBtn.style.display = "block";
-                updateUI("studying", "📖", "欢迎回来");
-                speak(pick(SPEECH.breakEnd));
+                currentState = "FOCUSED"; awayStartTime = null;
+                els.breakBtn.innerText = "休息"; els.stopBtn.style.display = "block";
+                updateUI("studying", "📖", "欢迎回来"); speak(pick(SPEECH.breakEnd));
             } else {
-                // 开始休息
                 currentState = "BREAK";
-                els.breakBtn.innerText = "结束休息";
-                els.stopBtn.style.display = "none"; // 休息时不能停止，防止作弊
-                updateUI("break", "☕", "休息中...");
-                speak(pick(SPEECH.breakStart));
+                els.breakBtn.innerText = "结束休息"; els.stopBtn.style.display = "none";
+                updateUI("break", "☕", "休息中..."); speak(pick(SPEECH.breakStart));
             }
         };
 
         document.getElementById('restart-btn').onclick = () => location.reload();
 
-        // 语音合成
         const synth = window.speechSynthesis;
         function speak(text) {
             if (!text || !synth) return;
@@ -461,10 +452,7 @@
             synth.speak(u);
         }
         function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-
-        // iOS 音频解锁
         document.body.addEventListener('click', () => { if(synth) synth.speak(new SpeechSynthesisUtterance(" ")); }, {once:true});
-
     </script>
 </body>
 </html>
