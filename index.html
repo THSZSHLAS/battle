@@ -1,59 +1,403 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blue Mountain Protocol</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI 学习监工 - 专业版</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            background-color: #1a1a1a;
+            height: 100vh;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+            color: white;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* === 核心视觉 UI：呼吸圆环 === */
+        #visual-ring {
+            width: 200px; height: 200px;
+            border: 8px solid #333; /* 默认灰色 */
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+        }
+
+        /* 学习中：绿色呼吸 */
+        body.studying #visual-ring {
+            border-color: #2ecc71;
+            box-shadow: 0 0 30px rgba(46, 204, 113, 0.3);
+            animation: breathe 3s infinite ease-in-out;
+        }
+
+        /* 警告：红色闪烁 */
+        body.warning #visual-ring {
+            border-color: #e74c3c;
+            background-color: rgba(231, 76, 60, 0.2);
+            box-shadow: 0 0 50px rgba(231, 76, 60, 0.6);
+            transform: scale(1.1);
+        }
+
+        /* 状态文字 */
+        #status-text {
+            margin-top: 40px;
+            font-size: 24px;
+            font-weight: 300;
+            opacity: 0.8;
+            letter-spacing: 2px;
+        }
+
+        /* 隐藏的视频源 */
+        video { position: absolute; top: 10px; right: 10px; width: 120px; opacity: 0.3; border-radius: 8px; transform: scaleX(-1); }
+
+        /* 底部控制栏 */
+        #controls {
+            position: fixed; bottom: 50px;
+            display: flex; gap: 20px;
+        }
+
+        button {
+            padding: 12px 30px;
+            border-radius: 30px;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:active { transform: scale(0.95); }
+
+        #start-btn { background: #2ecc71; color: #fff; }
+        #stop-btn { background: #e74c3c; color: #fff; display: none; }
+
+        /* 倒计时遮罩 */
+        #countdown-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            align-items: center; justify-content: center; flex-direction: column;
+            z-index: 100;
+        }
+        #cnt-num { font-size: 120px; font-weight: bold; color: #2ecc71; }
+        #cnt-tip { font-size: 20px; margin-top: 20px; color: #ccc; }
+
+        /* 结算报告面板 */
+        #report-panel {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 300px; background: #fff; color: #333;
+            padding: 30px; border-radius: 20px;
+            display: none; flex-direction: column; gap: 15px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            z-index: 200; text-align: center;
+        }
+        .stat-item { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .score-display { font-size: 48px; font-weight: bold; color: #2ecc71; margin: 10px 0; }
+        .close-report { background: #333; color: white; margin-top: 10px; }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+        }
+    </style>
 </head>
 <body>
 
-    <div class="game-container">
-        <canvas id="gameCanvas"></canvas>
-        
-        <div id="messageOverlay" class="hidden"></div>
-        <div id="bossOverlay" class="hidden boss-warning">⚠️ 强敌出现 ⚠️</div>
-        
-        <div id="gameOverOverlay" class="hidden">
-            <h1 id="endTitle">GAME OVER</h1>
-            <p id="endSubtitle"></p>
-            <p id="finalStats"></p>
-            <button id="btnRestartOverlay">再次挑战</button>
-        </div>
+    <div id="visual-ring">
+        <div style="font-size: 40px;">👁️</div>
+    </div>
+    <div id="status-text">等待启动</div>
+
+    <video id="webcam" autoplay playsinline muted></video>
+
+    <div id="controls">
+        <button id="start-btn">开始监督</button>
+        <button id="stop-btn">停止 (需密码)</button>
     </div>
 
-    <div class="ui-panel">
-        <div class="stats-row">
-            <span id="displayTime">Time: 00:00</span>
-            <span id="displayGold" class="gold-text">Gold: 10</span>
-            <span id="displayBaseHp" class="hp-text" style="color: #44ff44;">我方: 30</span>
-            <span id="displayBossHp" class="hp-text" style="color: #ff4444;">BOSS: ???</span>
-            <span id="displayKills">Kills: 0</span>
-        </div>
-
-        <hr class="ui-divider">
-
-        <div class="controls-row">
-            <div class="spawn-controls">
-                <button id="btnSpawnGreen" class="btn-spawn green">
-                    <div class="text-group">
-                        <span class="skill-name">蓝山心法 - 第一式</span>
-                        <span class="skill-desc">乌合之众 (1G)</span>
-                    </div>
-                </button>
-
-                <button id="btnSpawnBlue" class="btn-spawn blue">
-                    <div class="text-group">
-                        <span class="skill-name">蓝山心法 - 第X式</span>
-                        <span class="skill-desc">什么意思！！！！ (3G)</span>
-                    </div>
-                </button>
-            </div>
-
-            <button id="btnRestartUI" class="btn-restart">重置</button>
-        </div>
+    <div id="countdown-overlay">
+        <div id="cnt-num">3</div>
+        <div id="cnt-tip">请保持标准学习姿势<br>系统正在校准...</div>
     </div>
 
-    <script src="script.js"></script>
+    <div id="report-panel">
+        <h3>本次学习报告</h3>
+        <div class="score-display" id="final-score">98</div>
+        <div class="stat-item"><span>⏱️ 时长</span><span id="stat-time">0分</span></div>
+        <div class="stat-item"><span>👀 走神</span><span id="stat-distract">0次</span></div>
+        <div class="stat-item"><span>🦴 姿态</span><span id="stat-posture">0次</span></div>
+        <div class="stat-item"><span>👻 消失</span><span id="stat-absent">0次</span></div>
+        <button class="close-report" onclick="location.reload()">重新开始</button>
+    </div>
+
+    <script>
+        // ================= 配置区 =================
+        const CONFIG = {
+            // 管理员密码
+            PASSWORD: "8888", 
+            
+            // 判定灵敏度 (偏离基准多少算违规)
+            threshold: {
+                angle: 0.25, // 头部转动/抬头幅度阈值 (0-1)
+                dist: 0.15   // 头部位置移动幅度
+            },
+            
+            checkInterval: 1000 // 检测频率 (毫秒)
+        };
+
+        const SPEECH = {
+            start: "姿态已锁定，监督开始。请保持专注。",
+            distracted: ["看哪呢？回来看书。", "别东张西望。", "注意力集中！"],
+            posture: ["坐姿变形了，调整一下。", "歪七扭八的，坐直！"],
+            absent: ["人呢？快回来！", "你要去哪？学习还没结束！"],
+            stop: "监督结束。来看成绩单。"
+        };
+
+        // ================= 核心变量 =================
+        let faceLandmarker = null;
+        let isRunning = false;
+        let lastVideoTime = -1;
+        let lastCheck = 0;
+        
+        // 基准姿态 (校准后存储)
+        let basePose = {
+            yaw: 0,   // 左右
+            pitch: 0, // 上下
+            roll: 0,  // 歪头
+            centerX: 0,
+            centerY: 0
+        };
+
+        // 数据统计
+        let stats = {
+            startTime: 0,
+            distractCount: 0,
+            postureCount: 0,
+            absentCount: 0
+        };
+
+        // ================= 初始化 =================
+        async function initVision() {
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+            faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+                    delegate: "GPU" // 笔记本如果没独显会自动切CPU，不用担心
+                },
+                outputFaceBlendshapes: true,
+                runningMode: "VIDEO",
+                numFaces: 1
+            });
+            document.getElementById('status-text').innerText = "设备就绪";
+        }
+        initVision();
+
+        const video = document.getElementById('webcam');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+
+        // ================= 流程控制 =================
+        
+        // 1. 点击开始 -> 打开摄像头 -> 倒计时校准
+        startBtn.onclick = async () => {
+            if (!faceLandmarker) return alert("模型加载中...");
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                video.srcObject = stream;
+                startCalibration();
+            } catch(e) {
+                alert("无法打开摄像头，请允许权限或使用HTTPS");
+            }
+        };
+
+        // 2. 倒计时校准
+        function startCalibration() {
+            const overlay = document.getElementById('countdown-overlay');
+            const numEl = document.getElementById('cnt-num');
+            overlay.style.display = 'flex';
+            
+            let count = 3;
+            numEl.innerText = count;
+            speak("请保持标准学习坐姿，三秒后锁定。");
+
+            const timer = setInterval(() => {
+                count--;
+                numEl.innerText = count;
+                if (count <= 0) {
+                    clearInterval(timer);
+                    overlay.style.display = 'none';
+                    captureBasePose(); // 📸 捕捉当前姿势作为基准
+                }
+            }, 1000);
+        }
+
+        // 3. 锁定基准姿态 (关键算法)
+        function captureBasePose() {
+            const now = Date.now();
+            const results = faceLandmarker.detectForVideo(video, now);
+            
+            if (results.faceLandmarks.length > 0) {
+                const lm = results.faceLandmarks[0];
+                basePose = calculatePose(lm); // 记录此刻的姿态
+                
+                // 启动正式监督
+                isRunning = true;
+                stats.startTime = Date.now();
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'block';
+                document.body.className = "studying";
+                document.getElementById('status-text').innerText = "监督进行中...";
+                speak(SPEECH.start);
+                
+                predictLoop();
+            } else {
+                alert("未检测到人脸，请调整光线或位置重试");
+                startBtn.click(); // 重试
+            }
+        }
+
+        // 4. 停止监督 (密码锁)
+        stopBtn.onclick = () => {
+            const pwd = prompt("请输入密码停止监督：");
+            if (pwd === CONFIG.PASSWORD) {
+                isRunning = false;
+                showReport();
+            } else {
+                alert("密码错误，谁也别想跑！");
+                speak("密码错误，继续学习。");
+            }
+        };
+
+        // ================= 核心检测循环 =================
+        async function predictLoop() {
+            if (!isRunning) return;
+            
+            const now = Date.now();
+            if (now - lastCheck > CONFIG.checkInterval) {
+                if (video.currentTime !== lastVideoTime) {
+                    lastVideoTime = video.currentTime;
+                    const results = faceLandmarker.detectForVideo(video, now);
+                    analyzeBehavior(results);
+                    lastCheck = now;
+                }
+            }
+            requestAnimationFrame(predictLoop);
+        }
+
+        // 🧠 行为分析 (核心逻辑)
+        function analyzeBehavior(results) {
+            // A. 人不在
+            if (results.faceLandmarks.length === 0) {
+                handleWarning("absent", "👻 目标丢失");
+                return;
+            }
+
+            const currentPose = calculatePose(results.faceLandmarks[0]);
+            
+            // 计算偏离度 (当前姿态 - 基准姿态)
+            const diffYaw = Math.abs(currentPose.yaw - basePose.yaw);     // 左右转头幅度
+            const diffPitch = currentPose.pitch - basePose.pitch;         // 抬头幅度 (注意方向)
+            const diffRoll = Math.abs(currentPose.roll - basePose.roll);  // 歪头幅度
+            
+            // B. 走神 (大幅度转头 或 抬头)
+            // 注意：低头学习是允许的 (pitch 变大)，但抬头看屏幕/发呆是不行的 (pitch 变小/负数)
+            // 这里我们简单判定：只要 Yaw 偏离大，或者 Pitch 偏离大(抬头)，就报警
+            
+            if (diffYaw > CONFIG.threshold.angle) {
+                handleWarning("distracted", "👀 别东张西望");
+            } 
+            // 如果 currentPitch 比 basePitch 小很多，说明抬头了
+            else if (diffPitch < -CONFIG.threshold.angle) {
+                handleWarning("distracted", "👆 别抬头，看书");
+            }
+            // C. 坐姿 (歪头)
+            else if (diffRoll > 20) { // 20度以上
+                handleWarning("posture", "🦴 坐直了");
+            } 
+            else {
+                // 正常
+                document.body.className = "studying";
+                document.getElementById('status-text').innerText = "专注中...";
+            }
+        }
+
+        // 🧮 几何计算工具
+        function calculatePose(lm) {
+            // 简单几何估算
+            const nose = lm[1];
+            const leftEye = lm[33];
+            const rightEye = lm[263];
+            
+            // Yaw (左右): 鼻尖在双眼连线上的相对位置
+            const midX = (leftEye.x + rightEye.x) / 2;
+            const yaw = nose.x - midX; 
+
+            // Pitch (上下): 鼻尖与眼睛的高度差
+            const eyeY = (leftEye.y + rightEye.y) / 2;
+            const pitch = nose.y - eyeY; 
+
+            // Roll (旋转): 双眼连线的斜率
+            const dx = rightEye.x - leftEye.x;
+            const dy = rightEye.y - leftEye.y;
+            const roll = Math.atan2(dy, dx) * 180 / Math.PI;
+
+            return { yaw, pitch, roll };
+        }
+
+        // 🚨 警告处理
+        let warnCooldown = 0;
+        function handleWarning(type, text) {
+            document.body.className = "warning";
+            document.getElementById('status-text').innerText = text;
+            
+            // 记录数据 (防抖，3秒记一次)
+            if (Date.now() > warnCooldown) {
+                if(type === "distracted") stats.distractCount++;
+                if(type === "posture") stats.postureCount++;
+                if(type === "absent") stats.absentCount++;
+                
+                speak(pick(SPEECH[type]));
+                warnCooldown = Date.now() + 5000; // 5秒冷却，别骂太频繁
+            }
+        }
+
+        // 📊 生成报告
+        function showReport() {
+            const durationMin = Math.floor((Date.now() - stats.startTime) / 60000);
+            const totalWarnings = stats.distractCount + stats.postureCount + stats.absentCount;
+            
+            // 简单的评分公式
+            let score = 100 - (totalWarnings * 2);
+            if (score < 0) score = 0;
+
+            document.getElementById('stat-time').innerText = durationMin + " 分钟";
+            document.getElementById('stat-distract').innerText = stats.distractCount + " 次";
+            document.getElementById('stat-posture').innerText = stats.postureCount + " 次";
+            document.getElementById('stat-absent').innerText = stats.absentCount + " 次";
+            
+            const scoreEl = document.getElementById('final-score');
+            scoreEl.innerText = score;
+            scoreEl.style.color = score > 80 ? "#2ecc71" : (score > 60 ? "#f1c40f" : "#e74c3c");
+
+            document.getElementById('report-panel').style.display = 'flex';
+            speak(SPEECH.stop + `你的得分是 ${score} 分。`);
+        }
+
+        // 🔊 语音合成
+        const synth = window.speechSynthesis;
+        function speak(text) {
+            if (!text) return;
+            synth.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = "zh-CN"; u.rate = 1.2;
+            synth.speak(u);
+        }
+        function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    </script>
 </body>
 </html>
