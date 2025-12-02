@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 学习监工 - 专业版</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
+    <title>汤臣学习监督系统</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -110,12 +109,12 @@
     <div id="visual-ring">
         <div style="font-size: 40px;">👁️</div>
     </div>
-    <div id="status-text">等待启动</div>
+    <div id="status-text">系统初始化中...</div>
 
     <video id="webcam" autoplay playsinline muted></video>
 
     <div id="controls">
-        <button id="start-btn">开始监督</button>
+        <button id="start-btn" disabled>加载模型中...</button>
         <button id="stop-btn">停止 (需密码)</button>
     </div>
 
@@ -134,19 +133,22 @@
         <button class="close-report" onclick="location.reload()">重新开始</button>
     </div>
 
-    <script>
+    <script type="module">
+        // 导入核心库 (使用模块化导入解决 SyntaxError)
+        import { FilesetResolver, FaceLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
+
         // ================= 配置区 =================
         const CONFIG = {
             // 管理员密码
             PASSWORD: "8888", 
             
-            // 判定灵敏度 (偏离基准多少算违规)
+            // 判定灵敏度
             threshold: {
-                angle: 0.25, // 头部转动/抬头幅度阈值 (0-1)
-                dist: 0.15   // 头部位置移动幅度
+                angle: 0.25, 
+                dist: 0.15   
             },
             
-            checkInterval: 1000 // 检测频率 (毫秒)
+            checkInterval: 1000 
         };
 
         const SPEECH = {
@@ -163,16 +165,8 @@
         let lastVideoTime = -1;
         let lastCheck = 0;
         
-        // 基准姿态 (校准后存储)
-        let basePose = {
-            yaw: 0,   // 左右
-            pitch: 0, // 上下
-            roll: 0,  // 歪头
-            centerX: 0,
-            centerY: 0
-        };
+        let basePose = { yaw: 0, pitch: 0, roll: 0 };
 
-        // 数据统计
         let stats = {
             startTime: 0,
             distractCount: 0,
@@ -182,18 +176,31 @@
 
         // ================= 初始化 =================
         async function initVision() {
-            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
-            faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-                baseOptions: {
-                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-                    delegate: "GPU" // 笔记本如果没独显会自动切CPU，不用担心
-                },
-                outputFaceBlendshapes: true,
-                runningMode: "VIDEO",
-                numFaces: 1
-            });
-            document.getElementById('status-text').innerText = "设备就绪";
+            try {
+                const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+                faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+                        delegate: "GPU"
+                    },
+                    outputFaceBlendshapes: true,
+                    runningMode: "VIDEO",
+                    numFaces: 1
+                });
+                
+                // 模型加载完毕
+                document.getElementById('status-text').innerText = "设备就绪";
+                const btn = document.getElementById('start-btn');
+                btn.innerText = "开始监督";
+                btn.disabled = false;
+                
+            } catch (error) {
+                console.error(error);
+                document.getElementById('status-text').innerText = "加载失败，请检查网络";
+            }
         }
+        
+        // 启动初始化
         initVision();
 
         const video = document.getElementById('webcam');
@@ -202,19 +209,20 @@
 
         // ================= 流程控制 =================
         
-        // 1. 点击开始 -> 打开摄像头 -> 倒计时校准
         startBtn.onclick = async () => {
-            if (!faceLandmarker) return alert("模型加载中...");
+            if (!faceLandmarker) return;
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
                 video.srcObject = stream;
-                startCalibration();
+                // 确保视频流加载后再校准
+                video.onloadeddata = () => {
+                    startCalibration();
+                };
             } catch(e) {
-                alert("无法打开摄像头，请允许权限或使用HTTPS");
+                alert("无法打开摄像头，请确保使用 HTTPS 或 localhost");
             }
         };
 
-        // 2. 倒计时校准
         function startCalibration() {
             const overlay = document.getElementById('countdown-overlay');
             const numEl = document.getElementById('cnt-num');
@@ -230,21 +238,19 @@
                 if (count <= 0) {
                     clearInterval(timer);
                     overlay.style.display = 'none';
-                    captureBasePose(); // 📸 捕捉当前姿势作为基准
+                    captureBasePose();
                 }
             }, 1000);
         }
 
-        // 3. 锁定基准姿态 (关键算法)
         function captureBasePose() {
             const now = Date.now();
             const results = faceLandmarker.detectForVideo(video, now);
             
             if (results.faceLandmarks.length > 0) {
                 const lm = results.faceLandmarks[0];
-                basePose = calculatePose(lm); // 记录此刻的姿态
+                basePose = calculatePose(lm);
                 
-                // 启动正式监督
                 isRunning = true;
                 stats.startTime = Date.now();
                 startBtn.style.display = 'none';
@@ -256,11 +262,9 @@
                 predictLoop();
             } else {
                 alert("未检测到人脸，请调整光线或位置重试");
-                startBtn.click(); // 重试
             }
         }
 
-        // 4. 停止监督 (密码锁)
         stopBtn.onclick = () => {
             const pwd = prompt("请输入密码停止监督：");
             if (pwd === CONFIG.PASSWORD) {
@@ -272,7 +276,6 @@
             }
         };
 
-        // ================= 核心检测循环 =================
         async function predictLoop() {
             if (!isRunning) return;
             
@@ -288,9 +291,7 @@
             requestAnimationFrame(predictLoop);
         }
 
-        // 🧠 行为分析 (核心逻辑)
         function analyzeBehavior(results) {
-            // A. 人不在
             if (results.faceLandmarks.length === 0) {
                 handleWarning("absent", "👻 目标丢失");
                 return;
@@ -298,49 +299,36 @@
 
             const currentPose = calculatePose(results.faceLandmarks[0]);
             
-            // 计算偏离度 (当前姿态 - 基准姿态)
-            const diffYaw = Math.abs(currentPose.yaw - basePose.yaw);     // 左右转头幅度
-            const diffPitch = currentPose.pitch - basePose.pitch;         // 抬头幅度 (注意方向)
-            const diffRoll = Math.abs(currentPose.roll - basePose.roll);  // 歪头幅度
-            
-            // B. 走神 (大幅度转头 或 抬头)
-            // 注意：低头学习是允许的 (pitch 变大)，但抬头看屏幕/发呆是不行的 (pitch 变小/负数)
-            // 这里我们简单判定：只要 Yaw 偏离大，或者 Pitch 偏离大(抬头)，就报警
+            const diffYaw = Math.abs(currentPose.yaw - basePose.yaw);
+            const diffPitch = currentPose.pitch - basePose.pitch;
+            const diffRoll = Math.abs(currentPose.roll - basePose.roll);
             
             if (diffYaw > CONFIG.threshold.angle) {
                 handleWarning("distracted", "👀 别东张西望");
             } 
-            // 如果 currentPitch 比 basePitch 小很多，说明抬头了
             else if (diffPitch < -CONFIG.threshold.angle) {
                 handleWarning("distracted", "👆 别抬头，看书");
             }
-            // C. 坐姿 (歪头)
-            else if (diffRoll > 20) { // 20度以上
+            else if (diffRoll > 20) {
                 handleWarning("posture", "🦴 坐直了");
             } 
             else {
-                // 正常
                 document.body.className = "studying";
                 document.getElementById('status-text').innerText = "专注中...";
             }
         }
 
-        // 🧮 几何计算工具
         function calculatePose(lm) {
-            // 简单几何估算
             const nose = lm[1];
             const leftEye = lm[33];
             const rightEye = lm[263];
             
-            // Yaw (左右): 鼻尖在双眼连线上的相对位置
             const midX = (leftEye.x + rightEye.x) / 2;
             const yaw = nose.x - midX; 
 
-            // Pitch (上下): 鼻尖与眼睛的高度差
             const eyeY = (leftEye.y + rightEye.y) / 2;
             const pitch = nose.y - eyeY; 
 
-            // Roll (旋转): 双眼连线的斜率
             const dx = rightEye.x - leftEye.x;
             const dy = rightEye.y - leftEye.y;
             const roll = Math.atan2(dy, dx) * 180 / Math.PI;
@@ -348,37 +336,33 @@
             return { yaw, pitch, roll };
         }
 
-        // 🚨 警告处理
         let warnCooldown = 0;
         function handleWarning(type, text) {
             document.body.className = "warning";
             document.getElementById('status-text').innerText = text;
             
-            // 记录数据 (防抖，3秒记一次)
             if (Date.now() > warnCooldown) {
                 if(type === "distracted") stats.distractCount++;
                 if(type === "posture") stats.postureCount++;
                 if(type === "absent") stats.absentCount++;
                 
                 speak(pick(SPEECH[type]));
-                warnCooldown = Date.now() + 5000; // 5秒冷却，别骂太频繁
+                warnCooldown = Date.now() + 5000;
             }
         }
 
-        // 📊 生成报告
         function showReport() {
             const durationMin = Math.floor((Date.now() - stats.startTime) / 60000);
-            const totalWarnings = stats.distractCount + stats.postureCount + stats.absentCount;
             
-            // 简单的评分公式
-            let score = 100 - (totalWarnings * 2);
-            if (score < 0) score = 0;
-
             document.getElementById('stat-time').innerText = durationMin + " 分钟";
             document.getElementById('stat-distract').innerText = stats.distractCount + " 次";
             document.getElementById('stat-posture').innerText = stats.postureCount + " 次";
             document.getElementById('stat-absent').innerText = stats.absentCount + " 次";
             
+            // 简单的评分公式
+            let score = 100 - (stats.distractCount * 2 + stats.postureCount * 2 + stats.absentCount * 5);
+            if (score < 0) score = 0;
+
             const scoreEl = document.getElementById('final-score');
             scoreEl.innerText = score;
             scoreEl.style.color = score > 80 ? "#2ecc71" : (score > 60 ? "#f1c40f" : "#e74c3c");
@@ -387,7 +371,6 @@
             speak(SPEECH.stop + `你的得分是 ${score} 分。`);
         }
 
-        // 🔊 语音合成
         const synth = window.speechSynthesis;
         function speak(text) {
             if (!text) return;
@@ -397,6 +380,11 @@
             synth.speak(u);
         }
         function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        // 解锁 iOS 音频
+        document.body.addEventListener('click', () => {
+            if(window.speechSynthesis) synth.speak(new SpeechSynthesisUtterance(" "));
+        }, { once: true });
 
     </script>
 </body>
