@@ -3,14 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>蓝山监督 - 铁证版</title>
+    <title>汤臣学习监督系统5.6</title>
     <style>
         /* --- 基础样式 --- */
         body { margin: 0; padding: 0; background-color: #1a1a1a; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: white; overflow: hidden; user-select: none; }
 
-        /* === 核心视觉 UI === */
+        /* === 视觉圆环 === */
         #visual-ring { width: 200px; height: 200px; border: 8px solid #444; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.4s; position: relative; background: rgba(0,0,0,0.2); z-index: 5; }
         body.studying #visual-ring { border-color: #2ecc71; box-shadow: 0 0 40px rgba(46, 204, 113, 0.4); animation: breathe 3s infinite; }
         body.warning #visual-ring { border-color: #e74c3c; background-color: rgba(231, 76, 60, 0.15); box-shadow: 0 0 60px rgba(231, 76, 60, 0.7); transform: scale(1.05); animation: pulse-red 0.5s infinite; }
@@ -43,21 +41,43 @@
         #countdown-overlay, #report-panel { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(0,0,0,0.95); }
         
         /* 报告面板 */
-        #report-panel { background: #1e1e1e; width: 90%; height: 90%; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 20px; padding: 20px; border: 1px solid #444; display: none; flex-direction: column; overflow: hidden; }
-        .report-header { text-align: center; margin-bottom: 10px; flex-shrink: 0; }
-        .score { font-size: 50px; font-weight: 800; color: #2ecc71; margin: 5px 0; }
+        #report-panel { background: #1e1e1e; width: 95%; height: 95%; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 20px; padding: 20px; border: 1px solid #444; display: none; flex-direction: column; overflow: hidden; box-sizing: border-box; }
         
-        /* 证据画廊 */
+        .report-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px; width: 100%; }
+        .score-box { text-align: left; }
+        .score-val { font-size: 40px; font-weight: 800; color: #2ecc71; line-height: 1; }
+        .score-label { font-size: 12px; color: #888; }
+        
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: right; }
+        .stat-item { font-size: 12px; color: #ccc; }
+        .stat-item b { color: #fff; font-size: 14px; margin-left: 5px; }
+
+        /* 证据画廊优化 */
+        #evidence-title { width: 100%; text-align: left; font-size: 14px; color: #aaa; margin-bottom: 10px; }
         #evidence-gallery {
-            flex: 1; width: 100%; overflow-y: auto; display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); 
-            gap: 10px; padding: 10px; background: #111; border-radius: 10px;
-            border: 1px solid #333; align-content: start;
+            flex: 1; width: 100%; overflow-y: auto; 
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* 更大的预览图 */
+            gap: 15px; padding: 10px; background: #111; border-radius: 10px; border: 1px solid #333;
+            align-content: start;
         }
-        .evidence-card { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid #444; aspect-ratio: 4/3; }
-        .evidence-card img { width: 100%; height: 100%; object-fit: contain; background: black; display: block; }
-        .evidence-tag { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0, 0.7); color: white; font-size: 11px; padding: 4px; text-align: center; }
         
+        .evidence-card { 
+            position: relative; border-radius: 8px; overflow: hidden; border: 1px solid #444; 
+            background: black; display: flex; align-items: center; justify-content: center;
+            min-height: 120px;
+        }
+        .evidence-card img { 
+            width: 100%; height: auto; display: block; 
+        }
+        .evidence-meta {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            background: rgba(0,0,0,0.7); color: white;
+            font-size: 12px; padding: 5px;
+            display: flex; justify-content: space-between;
+        }
+        .tag-gaming { color: #ff4757; font-weight: bold; }
+        .tag-face { color: #f1c40f; font-weight: bold; }
+
         .calib-btn { padding: 15px 30px; margin: 10px; background: #333; color: white; border: 1px solid #555; width: 260px; text-align: left; }
         .calib-btn.done { background: #2ecc71; border-color: #2ecc71; }
         #calib-start-study-btn { background: linear-gradient(135deg, #2ecc71, #27ae60); margin-top: 20px; width: 260px; text-align: center; font-size: 18px; opacity: 0.5; pointer-events: none; }
@@ -103,16 +123,24 @@
         <button id="calib-start-study-btn" class="calib-btn">开始监督</button>
     </div>
 
-    <div id="report-panel" style="display:none;">
+    <div id="report-panel">
         <div class="report-header">
-            <div class="score" id="final-score">0</div>
-            <div style="font-size:14px; color:#aaa;" id="report-summary"></div>
+            <div class="score-box">
+                <div class="score-val" id="final-score">0</div>
+                <div class="score-label">专注评分</div>
+            </div>
+            <div class="stat-grid">
+                <div class="stat-item">⏱️ 时长<b id="r-time">0分</b></div>
+                <div class="stat-item">👀 分心<b id="r-distract">0次</b></div>
+                <div class="stat-item">🎮 摸鱼<b id="r-screen">0次</b></div>
+                <div class="stat-item">👻 离开<b id="r-absent">0次</b></div>
+            </div>
         </div>
         
-        <div style="text-align:left; width:100%; color:#fff; font-weight:bold; margin-bottom:10px;">📸 违规证据库 (本地存储)：</div>
+        <div id="evidence-title">📸 违规证据库 (点击停止后自动生成)：</div>
         <div id="evidence-gallery"></div>
         
-        <button onclick="location.reload()" style="margin-top:15px; padding:15px; background:#2ecc71; color:white; width:100%; border:none; border-radius:10px; font-weight:bold;">新的一轮</button>
+        <button onclick="location.reload()" style="margin-top:15px; padding:15px; background:#2ecc71; color:white; width:100%; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">开启新的一轮</button>
     </div>
 
     <script type="module">
@@ -123,23 +151,19 @@
             checkInterval: 1000, 
             threshold: { angle: 0.28, roll: 20 },
             durations: { distractedMs: 3000, absentMs: 5000 },
-            // 屏幕热度 (翻倍容错)
             screen: {
-                diffThreshold: 10,  
-                heatUp: 10,         
-                coolDown: 5,        
-                triggerHeat: 160,   // 报警阈值 160 (满分200)
-                maxHeat: 200        
+                diffThreshold: 5,   
+                heatUp: 10, coolDown: 5, triggerHeat: 160, maxHeat: 200        
             },
             score: { base: 60, focusPerSec: 0.015, distractPen: 1.5, screenPen: 5, absentPen: 3 }
         };
 
         const SPEECH = {
             start: "全景监督启动。",
-            distracted: ["回来看书。", "注意力。", "别乱看。"],
+            distracted: ["请回来看书。", "别乱看。", "注意力。"],
             posture: ["坐直。", "腰背挺直。"],
             absent: ["人呢？", "快回来。"],
-            gaming: ["屏幕动静太大了，已截图取证！", "检测到玩游戏，请切回学习。"],
+            gaming: ["屏幕闪烁剧烈，正在截图取证！", "请停止娱乐行为。"],
             stop: "监督结束。"
         };
 
@@ -194,7 +218,7 @@
                 els.screenBtn.innerText = "✅ 屏幕已接入";
                 els.screenBtn.style.background = "#2ecc71";
                 screenStream.getVideoTracks()[0].onended = () => location.reload();
-            } catch(e) { alert("必须接入屏幕才能开始。"); }
+            } catch(e) { alert("必须接入屏幕才能开始。请选择‘整个屏幕’。"); }
         };
 
         els.startBtn.onclick = async () => {
@@ -254,34 +278,37 @@
             requestAnimationFrame(loop);
         }
 
-        // --- 核心截图修复 ---
+        // --- 核心修复：高清全屏截图 ---
         function captureEvidence(type) {
             if (evidenceList.length > 20) return;
 
-            const canvas = document.createElement('canvas');
-            canvas.width = 480; canvas.height = 360; // 固定尺寸，清晰度足够
-            const ctx = canvas.getContext('2d');
-            
-            // 确定截图源
             let sourceVideo = els.webcam;
             if (type === "GAMING") sourceVideo = els.screenVideo;
 
-            // 确保视频已经就绪
-            if (sourceVideo.readyState >= 2) {
-                if (type === "GAMING") {
-                    // 屏幕：全图绘制 (防止只截一部分变黑)
-                    ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
-                } else {
-                    // 摄像头：镜像绘制 (保持和预览一致)
-                    ctx.translate(canvas.width, 0);
-                    ctx.scale(-1, 1);
-                    ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
-                }
-                
-                const imgUrl = canvas.toDataURL('image/jpeg', 0.6);
-                const timeStr = new Date().toLocaleTimeString();
-                evidenceList.push({ type: type, time: timeStr, img: imgUrl });
+            // 安全检查
+            if (sourceVideo.readyState < 2) return;
+
+            const canvas = document.createElement('canvas');
+            // 使用视频真实分辨率的一半，兼顾清晰度和性能
+            // 比如 1920x1080 -> 960x540，足够看清文字
+            canvas.width = sourceVideo.videoWidth * 0.5;
+            canvas.height = sourceVideo.videoHeight * 0.5;
+            const ctx = canvas.getContext('2d');
+            
+            if (type === "GAMING") {
+                // 屏幕：原样绘制
+                ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
+            } else {
+                // 摄像头：水平翻转 (镜像修正)
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
             }
+            
+            // 导出图片
+            const imgUrl = canvas.toDataURL('image/jpeg', 0.6);
+            const timeStr = new Date().toLocaleTimeString();
+            evidenceList.push({ type: type, time: timeStr, img: imgUrl });
         }
 
         // --- 屏幕分析 ---
@@ -309,6 +336,7 @@
             const percent = Math.round((screenHeat / CONFIG.screen.maxHeat) * 100);
             els.actBar.style.width = percent + "%";
             els.actText.innerText = "屏幕热度: " + percent + "%";
+            
             if (percent > 40) els.actBar.style.background = "linear-gradient(90deg, #f1c40f, #e74c3c)";
             else els.actBar.style.background = "linear-gradient(90deg, #2ecc71, #f1c40f)";
 
@@ -316,7 +344,7 @@
             if (screenHeat > CONFIG.screen.triggerHeat) {
                 if (currentState !== "GAMING") {
                     handleWarn("gaming", "🎮 屏幕动静太大！");
-                    captureEvidence("GAMING"); // 📸
+                    captureEvidence("GAMING"); // 📸 抓拍屏幕
                     currentState = "GAMING";
                     stats.screenCount++;
                     stats.score -= CONFIG.score.screenPen;
@@ -333,7 +361,7 @@
             if (!results.faceLandmarks.length) {
                 if(currentState !== "ABSENT") { 
                     handleWarn("absent", "👻 人呢？");
-                    captureEvidence("ABSENT"); // 📸
+                    captureEvidence("ABSENT"); // 📸 抓拍
                     stats.absentCount++; stats.score -= CONFIG.score.absentPen; currentState="ABSENT"; 
                 }
                 return;
@@ -355,7 +383,7 @@
                         let txt = type === "posture" ? "🦴 坐直！" : "👀 别乱看";
                         
                         handleWarn(type, txt);
-                        captureEvidence(type === "posture" ? "POSTURE" : "DISTRACTED"); // 📸
+                        captureEvidence(type === "posture" ? "POSTURE" : "DISTRACTED"); // 📸 抓拍
                         
                         if(type==="distracted") stats.distractCount++; else stats.postureCount++;
                         stats.score -= (type==="distracted"?CONFIG.score.distractPen:CONFIG.score.posturePen);
@@ -427,8 +455,7 @@
             
             let s = Math.round(stats.score);
             document.getElementById('final-score').innerText = Math.max(0, s);
-            document.getElementById('report-summary').innerText = `视线偏离: ${stats.distractCount} | 屏幕摸鱼: ${stats.screenCount}`;
-
+            
             // 生成画廊
             els.gallery.innerHTML = "";
             if (evidenceList.length === 0) {
@@ -437,11 +464,16 @@
                 evidenceList.forEach(item => {
                     const card = document.createElement('div');
                     card.className = "evidence-card";
-                    const tagText = { "GAMING": "🎮 摸鱼", "ABSENT": "👻 离开", "DISTRACTED": "👀 分心", "POSTURE": "🦴 坐姿" }[item.type] || item.type;
+                    const tags = { "GAMING": "🎮 摸鱼", "ABSENT": "👻 离开", "DISTRACTED": "👀 分心", "POSTURE": "🦴 坐姿" };
+                    const tagText = tags[item.type] || item.type;
+                    const tagClass = item.type === 'GAMING' ? 'tag-gaming' : 'tag-face';
                     
                     card.innerHTML = `
                         <img src="${item.img}">
-                        <div class="evidence-tag" style="background:${item.type==='GAMING'?'#e74c3c':'#f1c40f'}">${tagText} ${item.time}</div>
+                        <div class="evidence-meta">
+                            <span class="${tagClass}">${tagText}</span>
+                            <span>${item.time}</span>
+                        </div>
                     `;
                     els.gallery.appendChild(card);
                 });
@@ -453,11 +485,11 @@
             if (currentState === "BREAK") {
                 currentState = "FOCUSED"; awayStartTime = null; screenHeat = 0;
                 els.breakBtn.innerText = "休息"; els.stopBtn.style.display = "block";
-                updateStatus("studying", "📖", "欢迎回来"); 
+                updateStatus("studying", "📖", "欢迎回来"); speak(pick(SPEECH.breakEnd));
             } else {
                 currentState = "BREAK";
                 els.breakBtn.innerText = "结束休息"; els.stopBtn.style.display = "none";
-                updateStatus("break", "☕", "休息中..."); 
+                updateStatus("break", "☕", "休息中..."); speak(pick(SPEECH.breakStart));
             }
         };
 
