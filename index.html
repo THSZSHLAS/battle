@@ -2,90 +2,94 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>蓝山全能监督系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>汤臣全能监督系统 V5.1</title>
     <style>
         /* --- 基础样式 --- */
-        body { margin: 0; padding: 0; background-color: #1a1a1a; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: white; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; padding: 0; background-color: #1a1a1a; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: white; overflow: hidden; user-select: none; }
 
-        /* === 核心视觉 UI：呼吸圆环 === */
-        #visual-ring { width: 220px; height: 220px; border: 8px solid #444; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); position: relative; background: rgba(0,0,0,0.2); z-index: 5; }
+        /* === 核心视觉 UI === */
+        #visual-ring { width: 200px; height: 200px; border: 8px solid #444; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.4s; position: relative; background: rgba(0,0,0,0.2); z-index: 5; }
+        body.studying #visual-ring { border-color: #2ecc71; box-shadow: 0 0 40px rgba(46, 204, 113, 0.4); animation: breathe 3s infinite; }
+        body.warning #visual-ring { border-color: #e74c3c; background-color: rgba(231, 76, 60, 0.15); box-shadow: 0 0 60px rgba(231, 76, 60, 0.7); transform: scale(1.05); animation: pulse-red 0.5s infinite; }
         
-        /* 状态样式 */
-        body.studying #visual-ring { border-color: #2ecc71; box-shadow: 0 0 40px rgba(46, 204, 113, 0.4); animation: breathe 3s infinite ease-in-out; }
-        body.warning #visual-ring { border-color: #e74c3c; background-color: rgba(231, 76, 60, 0.15); box-shadow: 0 0 60px rgba(231, 76, 60, 0.7); transform: scale(1.05); animation: pulse-red 0.8s infinite; }
-        body.break #visual-ring { border-color: #3498db; background-color: rgba(52, 152, 219, 0.15); box-shadow: 0 0 40px rgba(52, 152, 219, 0.5); animation: none; transform: scale(0.95); }
+        .icon { font-size: 60px; }
+        #status-text { margin-top: 30px; font-size: 20px; font-weight: 400; opacity: 0.9; text-align: center; height: 30px; z-index: 5; }
 
-        .icon { font-size: 60px; transition: all 0.3s; }
-        #status-text { margin-top: 40px; font-size: 20px; font-weight: 400; opacity: 0.8; letter-spacing: 1px; text-align: center; height: 30px; transition: color 0.3s; z-index: 5; }
-        body.warning #status-text { color: #ff7675; font-weight: bold; }
-
-        /* === 视频源 (人脸) === */
-        video#webcam { 
-            position: absolute; top: 20px; right: 20px; width: 240px; height: 180px; 
-            object-fit: cover; opacity: 0.8; border-radius: 12px; transform: scaleX(-1); 
-            border: 2px solid #555; transition: all 0.3s; z-index: 150; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        /* === 监控窗口 (画中画) === */
+        
+        /* 右上角：人脸 */
+        .cam-box {
+            position: absolute; top: 20px; right: 20px;
+            width: 200px; height: 150px;
+            border: 2px solid #555; border-radius: 10px;
+            overflow: hidden; z-index: 10; background: #000;
         }
-        video#webcam:hover { opacity: 1; border-color: #2ecc71; transform: scaleX(-1) scale(1.1); }
+        video#webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: 0.9; }
 
-        /* === 屏幕源 (隐藏，只用于计算) === */
-        video#screen-video { display: none; }
+        /* 左上角：屏幕 (新增) */
+        .screen-box {
+            position: absolute; top: 20px; left: 20px;
+            width: 240px; height: 150px; /* 屏幕宽一点 */
+            border: 2px solid #555; border-radius: 10px;
+            overflow: hidden; z-index: 10; background: #000;
+            display: flex; flex-direction: column;
+        }
+        video#screen-video { width: 100%; height: 130px; object-fit: contain; opacity: 1; }
+        
+        /* 屏幕活跃度条 */
+        #activity-bar-bg { width: 100%; height: 20px; background: #222; position: relative; }
+        #activity-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #2ecc71, #f1c40f, #e74c3c); transition: width 0.2s; }
+        #activity-text { position: absolute; top: 0; left: 5px; font-size: 10px; line-height: 20px; color: #fff; }
 
         /* 底部控制栏 */
-        #controls { position: fixed; bottom: 40px; display: flex; gap: 15px; align-items: center; padding: 10px 20px; background: rgba(30,30,30,0.8); backdrop-filter: blur(10px); border-radius: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); padding-bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 50; }
-        
-        button, select { padding: 12px 20px; border-radius: 25px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; outline: none; -webkit-appearance: none; }
-        button:active { transform: scale(0.92); }
-        
-        #screen-btn { background: #3498db; color: #fff; } /* 蓝色 */
-        #start-btn { background: #2ecc71; color: #fff; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4); } /* 绿色 */
+        #controls { position: fixed; bottom: 40px; display: flex; gap: 15px; align-items: center; padding: 12px 25px; background: rgba(30,30,30,0.9); border-radius: 40px; z-index: 50; }
+        button, select { padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.95); }
+        #screen-btn { background: #3498db; color: #fff; }
+        #start-btn { background: #2ecc71; color: #fff; }
         #stop-btn { background: #ff4757; color: #fff; display: none; }
         #break-btn { background: #f1c40f; color: #000; display: none; }
+        #mode-select { background: #444; color: #fff; }
+
+        /* 遮罩与报告 */
+        #countdown-overlay, #report-panel { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(0,0,0,0.95); }
+        #report-panel { background: #222; width: 320px; height: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 20px; padding: 30px; border: 1px solid #444; }
         
-        #mode-select { background: #444; color: #fff; padding-right: 30px; text-align: center; border: 1px solid #555; }
+        .calib-btn { padding: 15px 30px; margin: 10px; background: #333; color: white; border: 1px solid #555; width: 260px; text-align: left; }
+        .calib-btn.done { background: #2ecc71; border-color: #2ecc71; }
+        #calib-start-study-btn { background: linear-gradient(135deg, #2ecc71, #27ae60); margin-top: 20px; width: 260px; text-align: center; font-size: 18px; opacity: 0.5; pointer-events: none; }
+        #calib-start-study-btn.ready { opacity: 1; pointer-events: auto; }
 
-        /* 校准遮罩 */
-        #countdown-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 100; padding: 20px; box-sizing: border-box; }
-        #cnt-num { font-size: 28px; font-weight: bold; color: #2ecc71; margin-bottom: 30px; margin-top: 150px; }
-        .calib-section { margin-bottom: 25px; width: 100%; max-width: 320px; text-align: center; }
-        .calib-desc { font-size: 16px; color: #eee; margin-bottom: 10px; }
-        .calib-btn { width: 100%; padding: 14px; background: #333; border: 1px solid #555; color: #fff; }
-        .calib-btn.done { background: #2ecc71; border-color: #2ecc71; color: #fff; }
-        .calib-status { font-size: 12px; margin-top: 5px; color: #777; height: 16px; }
-        
-        #calib-start-study-btn { background: linear-gradient(135deg, #2ecc71, #27ae60); width: 100%; margin-top: 20px; font-size: 18px; padding: 16px; opacity: 0.5; pointer-events: none; transition: opacity 0.3s; }
-        #calib-start-study-btn.ready { opacity: 1; pointer-events: auto; box-shadow: 0 0 20px rgba(46, 204, 113, 0.4); transform: scale(1.05); }
+        .score { font-size: 50px; font-weight: 800; color: #2ecc71; margin: 10px 0; }
+        .row { display: flex; justify-content: space-between; width: 100%; margin: 8px 0; color: #ccc; border-bottom: 1px solid #333; padding-bottom: 5px; }
 
-        /* 报告面板 */
-        #report-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); width: 320px; max-width: 90%; background: #222; color: #fff; padding: 30px; border-radius: 24px; display: none; flex-direction: column; gap: 15px; box-shadow: 0 25px 60px rgba(0,0,0,0.8); z-index: 200; text-align: center; border: 1px solid #333; opacity: 0; transition: all 0.3s; }
-        #report-panel.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        .score-display { font-size: 60px; font-weight: 800; color: #2ecc71; line-height: 1; margin: 10px 0; text-shadow: 0 0 20px rgba(46, 204, 113, 0.3); }
-        .stat-row { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 8px 0; font-size: 14px; color: #aaa; }
-        .stat-val { color: #fff; font-weight: bold; }
-        .close-report { background: #444; color: white; margin-top: 15px; width: 100%; }
-
-        @keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } }
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(231, 76, 60, 0); } 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); } }
+        @keyframes breathe { 0%,100%{opacity:0.8;transform:scale(1);} 50%{opacity:1;transform:scale(1.05);} }
+        @keyframes pulse-red { 0%,100%{box-shadow:0 0 0 rgba(231,76,60,0);} 50%{box-shadow:0 0 40px rgba(231,76,60,0.8);} }
     </style>
 </head>
 <body>
 
-    <div id="visual-ring">
-        <div class="icon" id="status-icon">👁️</div>
-    </div>
-    <div id="status-text">系统初始化中...</div>
+    <div id="visual-ring"><div class="icon" id="status-icon">👁️</div></div>
+    <div id="status-text">系统初始化...</div>
 
-    <video id="webcam" autoplay playsinline muted></video>
-    <video id="screen-video" autoplay playsinline muted></video>
+    <div class="screen-box" id="screen-box-ui" style="visibility: hidden;">
+        <video id="screen-video" autoplay playsinline muted></video>
+        <div id="activity-bar-bg">
+            <div id="activity-bar"></div>
+            <div id="activity-text">屏幕热度: 0%</div>
+        </div>
+    </div>
+
+    <div class="cam-box">
+        <video id="webcam" autoplay playsinline muted></video>
+    </div>
 
     <div id="controls">
         <select id="mode-select">
-            <option value="easy">轻松模式</option>
-            <option value="normal" selected>标准模式</option>
-            <option value="hard">硬核模式</option>
+            <option value="easy">宽松</option>
+            <option value="normal" selected>标准</option>
+            <option value="hard">严格</option>
         </select>
         <button id="screen-btn">① 接入屏幕</button>
         <button id="start-btn" disabled>② 接入人脸</button>
@@ -94,245 +98,176 @@
     </div>
 
     <div id="countdown-overlay">
-        <div id="cnt-num">请看着右上角视频校准</div>
-        
-        <div class="calib-section">
-            <button id="calib-screen-btn" class="calib-btn">① 锁定“看屏幕”姿势</button>
-            <div id="calib-screen-status" class="calib-status"></div>
-        </div>
-        
-        <div class="calib-section">
-            <button id="calib-book-btn" class="calib-btn">② (可选) 锁定“看书”姿势</button>
-            <div id="calib-book-status" class="calib-status"></div>
-        </div>
-
-        <button id="calib-start-study-btn" class="calib-btn">开始全景监督</button>
-        <div style="font-size:12px; color:#666; margin-top:15px;">* 请确保此时屏幕上显示的是学习内容</div>
+        <h2 style="color:white; margin-bottom:30px;">姿态校准</h2>
+        <button id="calib-screen-btn" class="calib-btn">① 锁定“看屏幕”姿势</button>
+        <button id="calib-book-btn" class="calib-btn">② (可选) 锁定“看书”姿势</button>
+        <button id="calib-start-study-btn" class="calib-btn">开始监督</button>
     </div>
 
-    <div id="report-panel">
-        <div style="font-size:14px; color:#888;">本次专注评分</div>
-        <div class="score-display" id="final-score">0</div>
-        
-        <div class="stat-row"><span>⏱️ 专注时长</span><span class="stat-val" id="stat-time">0分</span></div>
-        <div class="stat-row"><span>👀 视线偏离</span><span class="stat-val" id="stat-distract">0次</span></div>
-        <div class="stat-row"><span>🦴 坐姿提醒</span><span class="stat-val" id="stat-posture">0次</span></div>
-        <div class="stat-row"><span>🎮 屏幕摸鱼</span><span class="stat-val" id="stat-screen">0次</span></div>
-        <div class="stat-row"><span>👻 离开画面</span><span class="stat-val" id="stat-absent">0次</span></div>
-        
-        <button class="close-report" id="restart-btn">重新开始</button>
+    <div id="report-panel" style="display:none;">
+        <h3 style="color:white; margin:0;">专注评分</h3>
+        <div class="score" id="final-score">0</div>
+        <div class="row"><span>⏱️ 时长</span><span id="r-time">0分</span></div>
+        <div class="row"><span>👀 视线偏离</span><span id="r-distract">0次</span></div>
+        <div class="row"><span>🎮 屏幕娱乐</span><span id="r-screen">0次</span></div>
+        <div class="row"><span>👻 离开画面</span><span id="r-absent">0次</span></div>
+        <button onclick="location.reload()" style="margin-top:20px; padding:12px; background:#444; color:white; width:100%; border:none; border-radius:20px;">重新开始</button>
     </div>
 
     <script type="module">
         import { FilesetResolver, FaceLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
 
-        // ================= 配置中心 =================
         const CONFIG = {
             PASSWORD: "8888",
             checkInterval: 1000, 
             
-            // 人脸阈值
-            threshold: { angle: 0.25, rollDeg: 20 },
+            // 阈值配置
+            threshold: { angle: 0.28, roll: 20 },
             durations: { distractedMs: 3000, absentMs: 5000 },
             
-            // 屏幕阈值 (强化灵敏度)
+            // 屏幕热度系统 (Heat System)
             screen: {
-                diffThreshold: 20, // 只要超过20个像素点剧烈变化就算动了 (非常灵敏)
-                triggerCount: 8    // 连续 8 次检测(约8秒)都在动 -> 判定看视频
+                diffThreshold: 5,   // 只要有 5 个像素点剧烈变化就算动 (极高灵敏度)
+                heatUp: 15,         // 动一下加 15 热度
+                coolDown: 5,        // 每秒冷却 5 热度
+                triggerHeat: 80,    // 热度超过 80 报警
+                maxHeat: 100
             },
 
-            // 分数权重
-            score: { base: 60, focusPerSec: 0.015, distractPen: 1.5, posturePen: 1.2, absentPen: 3, screenPen: 5 }
+            score: { base: 60, focusPerSec: 0.015, distractPen: 1.5, screenPen: 5, absentPen: 3 }
         };
 
         const SPEECH = {
-            start: "全景监督启动，请保持学习。",
-            focusAgain: ["状态回来了，很好。", "保持专注。", "继续加油。"],
-            distracted: ["看哪呢？回来看书。", "别东张西望。", "注意力集中！"],
-            posture: ["坐直了！腰不要了？", "坐好。", "脊椎警告！"],
-            absent: ["人呢？去哪了？", "快回来学习！", "目标丢失。"],
-            gaming: ["屏幕一直在闪，是在看视频吗？", "检测到娱乐活动，请切回学习。", "别摸鱼了，关掉视频。"],
-            breakStart: ["休息一下，活动眼睛。", "休息开始。"],
-            breakEnd: ["休息结束，回来专注。", "好了，收心继续。"],
-            stop: "监督结束。来看你的成绩单。"
+            start: "全景监督启动。",
+            focusAgain: ["状态回来了。", "保持专注。", "继续。"],
+            distracted: ["回来看书。", "别乱看。", "注意力。"],
+            posture: ["坐直。", "腰背挺直。"],
+            absent: ["人呢？", "快回来。"],
+            gaming: ["屏幕动静太大了，在看视频吗？", "检测到娱乐行为，请切回学习。", "别摸鱼了！"],
+            stop: "监督结束。"
         };
 
-        // ================= 状态变量 =================
+        // 状态变量
         let faceLandmarker = null;
         let isRunning = false;
-        let currentState = "IDLE"; // IDLE, FOCUSED, DISTRACTED, ABSENT, BREAK, GAMING
+        let currentState = "IDLE";
         let lastVideoTime = -1;
         let lastCheck = 0;
-        
-        // 姿态基准
-        let baseScreenPose = null;
-        let baseBookPose = null;
-
-        // 计时器
-        let awayStartTime = null;
-        let absentStartTime = null;
+        let baseScreenPose = null, baseBookPose = null;
+        let awayStartTime = null, absentStartTime = null;
 
         // 屏幕监控变量
         let screenStream = null;
         let screenCanvas = document.createElement('canvas');
         let screenCtx = screenCanvas.getContext('2d');
         let lastScreenData = null;
-        let screenActivityCounter = 0;
+        let screenHeat = 0; // 当前热度 (0-100)
 
-        // 统计数据
-        let stats = { startTime: 0, distractCount: 0, postureCount: 0, absentCount: 0, screenCount: 0, score: CONFIG.score.base };
+        // 统计
+        let stats = { start: 0, distractCount: 0, postureCount: 0, absentCount: 0, screenCount: 0, score: CONFIG.score.base };
+        let warnCooldown = 0;
 
-        // DOM 元素
+        // 元素
         const els = {
             webcam: document.getElementById('webcam'),
             screenVideo: document.getElementById('screen-video'),
+            screenBoxUI: document.getElementById('screen-box-ui'),
             startBtn: document.getElementById('start-btn'),
             screenBtn: document.getElementById('screen-btn'),
             stopBtn: document.getElementById('stop-btn'),
             breakBtn: document.getElementById('break-btn'),
-            statusText: document.getElementById('status-text'),
-            statusIcon: document.getElementById('status-icon'),
+            text: document.getElementById('status-text'),
+            icon: document.getElementById('status-icon'),
             modeSelect: document.getElementById('mode-select'),
             overlay: document.getElementById('countdown-overlay'),
-            report: document.getElementById('report-panel')
+            report: document.getElementById('report-panel'),
+            actBar: document.getElementById('activity-bar'),
+            actText: document.getElementById('activity-text')
         };
 
-        // ================= 初始化 =================
+        // 1. 初始化
         async function init() {
             try {
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
                 faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-                    baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-                        delegate: "GPU"
-                    },
+                    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
                     outputFaceBlendshapes: true, runningMode: "VIDEO", numFaces: 1
                 });
-                els.statusText.innerText = "设备就绪";
-            } catch (e) {
-                console.error(e);
-                els.statusText.innerText = "模型加载失败，请检查网络";
-            }
+                els.startBtn.innerText = "② 接入人脸";
+                els.startBtn.disabled = false;
+            } catch(e) { console.error(e); }
         }
         init();
 
-        // ================= 核心流程 =================
-        
-        // 1. 接入屏幕 (必须先做)
+        // 2. 屏幕接入
         els.screenBtn.onclick = async () => {
             try {
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: false });
                 els.screenVideo.srcObject = screenStream;
-                
-                // 按钮变绿
+                els.screenBoxUI.style.visibility = 'visible'; // 显示预览
                 els.screenBtn.innerText = "✅ 屏幕已接入";
                 els.screenBtn.style.background = "#2ecc71";
-                els.startBtn.disabled = false;
-
-                // 监听停止共享
-                screenStream.getVideoTracks()[0].onended = () => {
-                    alert("屏幕共享已停止，监督中止！");
-                    location.reload();
-                };
-            } catch(e) {
-                alert("请先选择分享屏幕 (推荐选择'整个屏幕')");
-            }
+                screenStream.getVideoTracks()[0].onended = () => location.reload();
+            } catch(e) { alert("必须接入屏幕才能开始。"); }
         };
 
-        // 2. 打开摄像头 (必须后做)
+        // 3. 摄像头接入
         els.startBtn.onclick = async () => {
             if (!faceLandmarker) return;
             if (!screenStream) { alert("请先接入屏幕！"); return; }
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
                 els.webcam.srcObject = stream;
-                els.webcam.onloadeddata = () => {
-                    els.overlay.style.display = 'flex';
-                    speak("请进行姿态校准。");
-                };
-            } catch(e) {
-                alert("无法打开摄像头，请确保使用 HTTPS 协议或本地 localhost。");
-            }
+                els.webcam.onloadeddata = () => els.overlay.style.display = 'flex';
+            } catch(e) { alert("摄像头打开失败"); }
         };
 
-        // 3. 校准逻辑
-        function capturePose() {
+        // 4. 校准
+        const capturePose = () => {
             const now = performance.now();
             const res = faceLandmarker.detectForVideo(els.webcam, now);
-            if (res && res.faceLandmarks.length > 0) {
-                return calculatePose(res.faceLandmarks[0]);
-            }
-            return null;
-        }
-
+            return (res && res.faceLandmarks.length) ? calculatePose(res.faceLandmarks[0]) : null;
+        };
         document.getElementById('calib-screen-btn').onclick = function() {
-            const pose = capturePose();
-            if (pose) {
-                baseScreenPose = pose;
-                this.classList.add('done');
-                this.innerText = "已锁定 (看屏幕) ✅";
-                checkCalibReady();
-                speak("屏幕姿态已锁定。");
-            } else alert("未检测到人脸，请看着右上角视频。");
+            const p = capturePose();
+            if(p) { baseScreenPose = p; this.classList.add('done'); this.innerText="已锁定 (看屏幕) ✅"; checkReady(); } else alert("没看到脸");
         };
-
         document.getElementById('calib-book-btn').onclick = function() {
-            const pose = capturePose();
-            if (pose) {
-                baseBookPose = pose;
-                this.classList.add('done');
-                this.innerText = "已锁定 (看书本) ✅";
-                checkCalibReady();
-                speak("书本姿态已锁定。");
-            } else alert("未检测到人脸，请看着右上角视频。");
+            const p = capturePose();
+            if(p) { baseBookPose = p; this.classList.add('done'); this.innerText="已锁定 (看书本) ✅"; checkReady(); } else alert("没看到脸");
         };
+        function checkReady() { if(baseScreenPose || baseBookPose) document.getElementById('calib-start-study-btn').classList.add('ready'); }
 
-        function checkCalibReady() {
-            if (baseScreenPose || baseBookPose) { 
-                const btn = document.getElementById('calib-start-study-btn');
-                btn.classList.add('ready');
-                btn.disabled = false;
-            }
-        }
-
+        // 5. 开始
         document.getElementById('calib-start-study-btn').onclick = () => {
-            if (!baseScreenPose && !baseBookPose) return;
             els.overlay.style.display = 'none';
-            startSession();
-        };
-
-        function startSession() {
-            applyMode(els.modeSelect.value);
-            stats = { startTime: Date.now(), distractCount: 0, postureCount: 0, absentCount: 0, screenCount: 0, score: CONFIG.score.base };
-            isRunning = true;
-            currentState = "FOCUSED";
-            
             els.startBtn.style.display = 'none';
             els.screenBtn.style.display = 'none';
             els.modeSelect.style.display = 'none';
             els.breakBtn.style.display = 'block';
             els.stopBtn.style.display = 'block';
             
-            updateUI("studying", "📖", "监督进行中...");
+            applyMode(els.modeSelect.value);
+            stats.start = Date.now();
+            isRunning = true;
+            updateStatus("studying", "📖", "全景监督中...");
             speak(SPEECH.start);
             loop();
-        }
+        };
 
-        // ================= 循环检测 =================
-        async function loop() {
+        // 6. 主循环
+        function loop() {
             if (!isRunning) return;
             if (currentState === "BREAK") { requestAnimationFrame(loop); return; }
 
-            const now = performance.now();
+            const now = Date.now();
             if (now - lastCheck > CONFIG.checkInterval) {
                 
-                // 1. 屏幕检测 (独立逻辑)
-                analyzeScreen();
-
-                // 2. 人脸检测
-                if (els.webcam.currentTime !== lastVideoTime) {
-                    lastVideoTime = els.webcam.currentTime;
-                    const res = faceLandmarker.detectForVideo(els.webcam, now);
+                // 并行检测
+                if(screenStream) analyzeScreen();
+                
+                if (els.webcam.currentTime > 0) {
+                    const res = faceLandmarker.detectForVideo(els.webcam, performance.now());
                     analyzeFace(res);
                 }
                 
@@ -341,12 +276,10 @@
             requestAnimationFrame(loop);
         }
 
-        // ================= 屏幕分析 (增强版) =================
+        // --- 屏幕热度算法 (Heat System) ---
         function analyzeScreen() {
-            if (!screenStream) return;
-
-            // 1. 降采样到 64x48，足够检测运动，且性能开销极低
-            const w = 64, h = 48;
+            // 降采样
+            const w = 128, h = 72; //稍微大一点点以适应Mac
             screenCanvas.width = w; screenCanvas.height = h;
             screenCtx.drawImage(els.screenVideo, 0, 0, w, h);
             
@@ -355,219 +288,169 @@
 
             if (!lastScreenData) { lastScreenData = data; return; }
 
-            // 2. 计算差异
-            let diffScore = 0;
-            // 步长 8 (每隔2个像素检测一个)，兼顾速度和精度
-            for (let i = 0; i < data.length; i += 8) {
+            let diffCount = 0;
+            // 步长取 4 (逐像素检查)
+            for (let i = 0; i < data.length; i += 4) {
                 const diff = Math.abs(data[i] - lastScreenData[i]) + 
                              Math.abs(data[i+1] - lastScreenData[i+1]) + 
                              Math.abs(data[i+2] - lastScreenData[i+2]);
-                if (diff > 50) diffScore++; // 只要颜色变化超过 50 (很小的变化) 就计入
+                if (diff > 50) diffCount++;
             }
             lastScreenData = data;
 
-            // 3. 判定
-            // 阈值：CONFIG.screen.diffThreshold (20)。只要有 20 个采样点动了就算动。
-            if (diffScore > CONFIG.screen.diffThreshold) {
-                screenActivityCounter++;
+            // 热度计算
+            if (diffCount > CONFIG.screen.diffThreshold) {
+                screenHeat += CONFIG.screen.heatUp; // 动了，加热度
             } else {
-                // 缓慢冷却，防止我看一会视频停一下就漏判
-                screenActivityCounter = Math.max(0, screenActivityCounter - 1);
+                screenHeat -= CONFIG.screen.coolDown; // 没动，散热
             }
+            
+            // 限制范围
+            screenHeat = Math.max(0, Math.min(CONFIG.screen.maxHeat, screenHeat));
 
-            // 4. 报警
-            if (screenActivityCounter > CONFIG.screen.triggerCount) {
-                handleStateChange("GAMING");
-                // 报警后稍微重置一下，避免一直重复报警太频繁
-                screenActivityCounter = Math.max(0, screenActivityCounter - 4); 
+            // 更新 UI 条
+            els.actBar.style.width = screenHeat + "%";
+            els.actText.innerText = "屏幕活跃: " + Math.round(screenHeat) + "%";
+            
+            // 变色预警
+            if (screenHeat > 50) els.actBar.style.background = "linear-gradient(90deg, #f1c40f, #e74c3c)";
+            else els.actBar.style.background = "linear-gradient(90deg, #2ecc71, #f1c40f)";
+
+            // 报警
+            if (screenHeat > CONFIG.screen.triggerHeat) {
+                handleWarn("gaming", "🎮 屏幕动静太大！");
+                if (currentState !== "GAMING") {
+                    currentState = "GAMING";
+                    stats.screenCount++;
+                    stats.score -= CONFIG.score.screenPen;
+                }
+            } else if (currentState === "GAMING" && screenHeat < 50) {
+                // 热度降下来了，恢复
+                currentState = "FOCUSED";
+                updateStatus("studying", "📖", "学习中...");
             }
         }
 
-        // ================= 人脸分析 =================
         function analyzeFace(results) {
-            // 如果屏幕正在报警，先不报人脸，避免冲突
-            if (currentState === "GAMING") return;
+            if(currentState === "GAMING") return; // 屏幕报警优先
 
-            if (!results || !results.faceLandmarks || results.faceLandmarks.length === 0) {
-                handleStateChange("ABSENT");
+            if (!results.faceLandmarks.length) {
+                handleWarn("absent", "👻 人呢？");
+                if(currentState !== "ABSENT") { stats.absentCount++; stats.score -= CONFIG.score.absentPen; currentState="ABSENT"; }
                 return;
             }
             absentStartTime = null;
 
             const lm = results.faceLandmarks[0];
-            const currentPose = calculatePose(lm);
+            const p = calculatePose(lm);
+            let ok = false;
+            if (baseScreenPose && isClose(p, baseScreenPose)) ok = true;
+            if (baseBookPose && isClose(p, baseBookPose)) ok = true;
 
-            let isGoodPose = false;
-            if (baseScreenPose && checkPoseMatch(currentPose, baseScreenPose)) isGoodPose = true;
-            if (!isGoodPose && baseBookPose && checkPoseMatch(currentPose, baseBookPose)) isGoodPose = true;
-
-            if (isGoodPose) {
-                handleStateChange("FOCUSED");
-            } else {
-                const diffRoll = baseScreenPose ? Math.abs(currentPose.roll - baseScreenPose.roll) : 0;
-                if (diffRoll > CONFIG.threshold.rollDeg) {
-                    handleStateChange("POSTURE_BAD");
+            if (!ok) {
+                if(!awayStartTime) awayStartTime = Date.now();
+                if(Date.now() - awayStartTime > CONFIG.durations.distractedMs) {
+                    const diffRoll = baseScreenPose ? Math.abs(p.roll - baseScreenPose.roll) : 0;
+                    if (diffRoll > CONFIG.threshold.roll) {
+                        handleWarn("posture", "🦴 坐直！");
+                        if(currentState!=="POSTURE") { stats.postureCount++; stats.score -= CONFIG.score.posturePen; currentState="POSTURE"; }
+                    } else {
+                        handleWarn("distracted", "👀 别乱看");
+                        if(currentState!=="DISTRACTED") { stats.distractCount++; stats.score -= CONFIG.score.distractPen; currentState="DISTRACTED"; }
+                    }
                 } else {
-                    handleStateChange("DISTRACTED");
-                }
-            }
-        }
-
-        // ================= 状态机 =================
-        function handleStateChange(newState) {
-            // 1. 专注加分
-            if (newState === "FOCUSED") {
-                stats.score += CONFIG.score.focusPerSec * (CONFIG.checkInterval/1000);
-                if (stats.score > 100) stats.score = 100;
-                
-                // 从坏状态恢复
-                if (currentState !== "FOCUSED") {
-                    updateUI("studying", "📖", "专注中...");
-                    awayStartTime = null;
-                    if (["DISTRACTED", "POSTURE_BAD", "ABSENT", "GAMING"].includes(currentState)) {
-                        speak(pick(SPEECH.focusAgain));
-                    }
-                }
-                currentState = "FOCUSED";
-                return;
-            }
-
-            // 2. 屏幕摸鱼 (最高优先级报警)
-            if (newState === "GAMING") {
-                if (currentState !== "GAMING") {
-                    stats.screenCount++;
-                    stats.score -= CONFIG.score.screenPen;
-                    updateUI("warning", "🎮", "屏幕闪烁太快！");
-                    speak(pick(SPEECH.gaming));
-                    currentState = "GAMING";
-                }
-                return;
-            }
-
-            // 3. 人脸异常 (带缓冲)
-            if (!awayStartTime) awayStartTime = Date.now();
-            const elapsed = Date.now() - awayStartTime;
-            const limit = (newState === "ABSENT") ? CONFIG.durations.absentMs : CONFIG.durations.distractedMs;
-
-            if (elapsed > limit) {
-                if (currentState !== newState) {
-                    currentState = newState;
-                    if (newState === "DISTRACTED") {
-                        stats.distractCount++;
-                        stats.score -= CONFIG.score.distractPen;
-                        updateUI("warning", "👀", "别东张西望");
-                        speak(pick(SPEECH.distracted));
-                    } else if (newState === "POSTURE_BAD") {
-                        stats.postureCount++;
-                        stats.score -= CONFIG.score.posturePen;
-                        updateUI("warning", "🦴", "坐直了！");
-                        speak(pick(SPEECH.posture));
-                    } else if (newState === "ABSENT") {
-                        stats.absentCount++;
-                        stats.score -= CONFIG.score.absentPen;
-                        updateUI("warning", "👻", "人呢？快回来");
-                        speak(pick(SPEECH.absent));
-                    }
-                    if (stats.score < 0) stats.score = 0;
+                    updateStatus("studying", "⚠️", "调整中...");
                 }
             } else {
-                document.body.className = "studying";
-                els.statusText.innerText = "调整中...";
+                awayStartTime = null;
+                if(currentState !== "FOCUSED") {
+                    currentState = "FOCUSED";
+                    updateStatus("studying", "📖", "学习中...");
+                    stats.score += CONFIG.score.focusPerSec;
+                    speak(pick(SPEECH.focusAgain));
+                }
+            }
+            if(stats.score < 0) stats.score = 0;
+            if(stats.score > 100) stats.score = 100;
+        }
+
+        // --- 工具 ---
+        function calculatePose(lm) {
+            const nose=lm[1], left=lm[33], right=lm[263];
+            const midX=(left.x+right.x)/2, eyeY=(left.y+right.y)/2;
+            return {
+                yaw: nose.x - midX,
+                pitch: nose.y - eyeY,
+                roll: Math.atan2(right.y-left.y, right.x-left.x)*180/Math.PI
+            };
+        }
+        function isClose(curr, base) {
+            return Math.abs(curr.yaw-base.yaw)<CONFIG.threshold.angle && 
+                   Math.abs(curr.pitch-base.pitch)<CONFIG.threshold.angle &&
+                   Math.abs(curr.roll-base.roll)<CONFIG.threshold.roll;
+        }
+        function handleWarn(type, txt) {
+            updateStatus("warning", txt.substring(0,2), txt);
+            if(Date.now() > warnCooldown) {
+                speak(pick(SPEECH[type]));
+                warnCooldown = Date.now() + 5000;
             }
         }
-
-        // ================= 辅助函数 =================
-        function calculatePose(lm) {
-            const nose = lm[1], leftEye = lm[33], rightEye = lm[263];
-            const midX = (leftEye.x + rightEye.x) / 2;
-            const eyeY = (leftEye.y + rightEye.y) / 2;
-            const yaw = nose.x - midX; 
-            const pitch = nose.y - eyeY; 
-            const dx = rightEye.x - leftEye.x;
-            const dy = rightEye.y - leftEye.y;
-            const roll = Math.atan2(dy, dx) * 180 / Math.PI;
-            return { yaw, pitch, roll };
-        }
-
-        function checkPoseMatch(curr, base) {
-            const dYaw = Math.abs(curr.yaw - base.yaw);
-            const dPitch = Math.abs(curr.pitch - base.pitch);
-            const dRoll = Math.abs(curr.roll - base.roll);
-            return (dYaw < CONFIG.threshold.angle && dPitch < CONFIG.threshold.angle && dRoll < CONFIG.threshold.rollDeg);
-        }
-
-        function updateUI(cls, icon, text) {
+        function updateStatus(cls, icon, txt) {
             document.body.className = cls;
-            els.statusIcon.innerText = icon;
-            els.statusText.innerText = text;
+            els.text.innerText = txt;
+            els.icon.innerText = icon;
         }
-
         function applyMode(mode) {
-            if (mode === "easy") { CONFIG.threshold.angle = 0.35; CONFIG.durations.distractedMs = 4000; }
-            else if (mode === "hard") { CONFIG.threshold.angle = 0.15; CONFIG.durations.distractedMs = 1500; }
-            else { CONFIG.threshold.angle = 0.25; CONFIG.durations.distractedMs = 3000; }
+            if(mode === "hard") { CONFIG.threshold.angle=0.15; CONFIG.screen.triggerHeat=60; }
+            else if(mode==="easy") { CONFIG.threshold.angle=0.35; CONFIG.screen.triggerHeat=90; }
         }
 
-        // ================= 按钮逻辑 =================
         els.stopBtn.onclick = () => {
-            const pwd = prompt("请输入密码停止监督：");
-            if (pwd === CONFIG.PASSWORD) {
+            if (prompt("密码：") === CONFIG.PASSWORD) {
                 isRunning = false;
-                if (els.webcam.srcObject) els.webcam.srcObject.getTracks().forEach(t => t.stop());
-                if (screenStream) screenStream.getTracks().forEach(t => t.stop());
+                if(screenStream) screenStream.getTracks().forEach(t=>t.stop());
+                if(els.webcam.srcObject) els.webcam.srcObject.getTracks().forEach(t=>t.stop());
                 
-                // 修复：显式设置为 Flex
+                // 修复：确保显示
                 els.report.style.display = 'flex';
                 setTimeout(() => els.report.classList.add('show'), 10);
                 showReport();
-            } else {
-                alert("密码错误！"); speak("密码错误，谁也别想跑。");
-            }
+            } else speak("密码错误");
         };
 
         function showReport() {
-            const durationMs = Date.now() - stats.startTime;
-            const durationMin = Math.max(1, Math.round(durationMs / 60000));
-            document.getElementById('stat-time').innerText = durationMin + " 分钟";
-            document.getElementById('stat-distract').innerText = stats.distractCount + " 次";
-            document.getElementById('stat-posture').innerText = stats.postureCount + " 次";
-            document.getElementById('stat-absent').innerText = stats.absentCount + " 次";
-            document.getElementById('stat-screen').innerText = stats.screenCount + " 次";
-            const finalScore = Math.round(Math.max(0, Math.min(100, stats.score)));
-            document.getElementById('final-score').innerText = finalScore;
-            
-            const scoreEl = document.getElementById('final-score');
-            if (finalScore >= 85) scoreEl.style.color = "#2ecc71";
-            else if (finalScore >= 70) scoreEl.style.color = "#f1c40f";
-            else scoreEl.style.color = "#e74c3c";
-            
-            speak(SPEECH.stop + `你的专注积分是 ${finalScore} 分。`);
+            document.getElementById('r-time').innerText = Math.floor((Date.now()-stats.start)/60000)+"分";
+            document.getElementById('r-distract').innerText = stats.distractCount;
+            document.getElementById('r-screen').innerText = stats.screenCount;
+            document.getElementById('r-absent').innerText = stats.absentCount;
+            document.getElementById('final-score').innerText = Math.round(stats.score);
+            speak(SPEECH.stop);
         }
 
         els.breakBtn.onclick = () => {
             if (currentState === "BREAK") {
-                currentState = "FOCUSED"; awayStartTime = null; screenActivityCounter = 0;
+                currentState = "FOCUSED"; awayStartTime = null; screenHeat = 0;
                 els.breakBtn.innerText = "休息"; els.stopBtn.style.display = "block";
-                updateUI("studying", "📖", "欢迎回来"); speak(pick(SPEECH.breakEnd));
+                updateStatus("studying", "📖", "欢迎回来"); speak(pick(SPEECH.breakEnd));
             } else {
                 currentState = "BREAK";
                 els.breakBtn.innerText = "结束休息"; els.stopBtn.style.display = "none";
-                updateUI("break", "☕", "休息中..."); speak(pick(SPEECH.breakStart));
+                updateStatus("break", "☕", "休息中..."); speak(pick(SPEECH.breakStart));
             }
         };
 
-        document.getElementById('restart-btn').onclick = () => location.reload();
-
         const synth = window.speechSynthesis;
         function speak(text) {
-            if (!text || !synth) return;
+            if(!synth) return;
             synth.cancel();
             const u = new SpeechSynthesisUtterance(text);
             u.lang = "zh-CN"; u.rate = 1.2;
             synth.speak(u);
         }
-        function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-        document.body.addEventListener('click', () => { if(synth) synth.speak(new SpeechSynthesisUtterance(" ")); }, {once:true});
+        function pick(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+        document.body.addEventListener('click', ()=>{if(synth)synth.speak(new SpeechSynthesisUtterance(" "))}, {once:true});
+
     </script>
 </body>
 </html>
